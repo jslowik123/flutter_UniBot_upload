@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'Screens/ProjectListScreen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'Support/firebase_options.dart';
+import 'Screens/LLMInterface.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "File Import",
       home: ProjectListScreen(),
-      routes:{ '/projectView': (context) => FileScreen()},
+      routes:{
+        '/projectView': (context) => FileScreen(),
+        '/LLMChat': (context) => LLMInterface(),
+      },
     );
   }
 }

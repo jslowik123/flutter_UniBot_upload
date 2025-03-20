@@ -35,7 +35,7 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<void> _fetchFilesFromStorage() async {
     final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     if (routeArgs == null) return;
 
     final projectName = routeArgs['name'] ?? 'unbekannt';
@@ -46,12 +46,10 @@ class _FileScreenState extends State<FileScreen> {
       final result = await ref.listAll();
 
       setState(() {
-        _importedFiles = result.items.map((Reference fileRef) {
-          return {
-            'name': fileRef.name,
-            'path': fileRef.fullPath,
-          };
-        }).toList();
+        _importedFiles =
+            result.items.map((Reference fileRef) {
+              return {'name': fileRef.name, 'path': fileRef.fullPath};
+            }).toList();
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,9 +76,9 @@ class _FileScreenState extends State<FileScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Fehler beim Datei-Import: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Fehler beim Datei-Import: $e')));
     }
   }
 
@@ -96,7 +94,7 @@ class _FileScreenState extends State<FileScreen> {
     }
 
     final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
 
     if (routeArgs == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -173,23 +171,33 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
+  void _changeToChat(BuildContext context) {
+    Navigator.of(context).pushNamed('/LLMChat');
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final projectName = routeArgs?['name'] ?? "unbekannt";
 
     return Scaffold(
-      appBar: AppBar(title: Text(projectName)),
+      appBar: AppBar(
+        title: Text(projectName),
+        actions: [
+          IconButton(onPressed: () => _changeToChat(context), icon: Icon(Icons.chat)),
+        ],
+      ),
+
       body: Stack(
         children: [
           ListView.builder(
-            padding: const EdgeInsets.only(bottom: 120.0), // Korrigiere zu "bottom"
+            padding: const EdgeInsets.only(bottom: 120.0),
             itemCount: _importedFiles.length,
             itemBuilder: (context, index) {
               return FileTile(
                 _importedFiles[index],
-                    () => _deleteFile(_importedFiles[index]["path"]!),
+                () => _deleteFile(_importedFiles[index]["path"]!),
               );
             },
           ),
