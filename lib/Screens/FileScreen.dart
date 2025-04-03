@@ -185,7 +185,10 @@ class _FileScreenState extends State<FileScreen> {
       appBar: AppBar(
         title: Text(projectName),
         actions: [
-          IconButton(onPressed: () => _changeToChat(context), icon: Icon(Icons.chat)),
+          IconButton(
+            onPressed: () => _changeToChat(context),
+            icon: Icon(Icons.chat),
+          ),
         ],
       ),
 
