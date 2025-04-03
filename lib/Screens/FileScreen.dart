@@ -192,30 +192,35 @@ class _FileScreenState extends State<FileScreen> {
         ],
       ),
 
-      body: Stack(
-        children: [
-          ListView.builder(
-            padding: const EdgeInsets.only(bottom: 120.0),
-            itemCount: _importedFiles.length,
-            itemBuilder: (context, index) {
-              return FileTile(
-                _importedFiles[index],
-                () => _deleteFile(_importedFiles[index]["path"]!),
-              );
-            },
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 800),
+          child: Stack(
+            children: [
+              ListView.builder(
+                padding: const EdgeInsets.only(bottom: 120.0),
+                itemCount: _importedFiles.length,
+                itemBuilder: (context, index) {
+                  return FileTile(
+                    _importedFiles[index],
+                    () => _deleteFile(_importedFiles[index]["path"]!),
+                  );
+                },
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: newFile(
+                  fileName: _fileName,
+                  pickFileFunc: _pickFile, // Funktion direkt übergeben
+                  confirmSelectionFunc: _confirmSelection,
+                  filePicked: _filePicked,
+                ),
+              ),
+            ],
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: newFile(
-              fileName: _fileName,
-              pickFileFunc: _pickFile, // Funktion direkt übergeben
-              confirmSelectionFunc: _confirmSelection,
-              filePicked: _filePicked,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
