@@ -13,8 +13,22 @@ class _LLMInterfaceState extends State<LLMInterface> {
   final TextEditingController _controller = TextEditingController();
   List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  final String _baseUrl = 'http://localhost:8000';
+  bool _botStarted = false;
 
-  final String apiKey = 'secretkey';
+  Future<void> startBot() async {
+    final response = await http.post(
+      Uri.parse('http://127.0.0.1:8000/start_bot'),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      _botStarted = true;
+    } else {
+      throw Exception('Failed to start bot');
+    }
+  }
+
 
   Future<void> _sendMessage() async {
     final prompt = _controller.text.trim();
@@ -33,7 +47,7 @@ class _LLMInterfaceState extends State<LLMInterface> {
     try {
       final response = await http.post(
         Uri.parse('http://127.0.0.1:8000/generate'),
-        headers: {'Content-Type': 'application/json', 'x-api-key': apiKey},
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'prompt': prompt}),
       );
 
