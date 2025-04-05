@@ -1,9 +1,9 @@
-import 'Screens/FileScreen.dart';
+import 'Screens/file_screen.dart';
 import 'package:flutter/material.dart';
-import 'Screens/ProjectListScreen.dart';
+import 'Screens/project_list_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'Support/firebase_options.dart';
-import 'Screens/LLMInterface.dart';
+import 'Screens/llm_interface.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

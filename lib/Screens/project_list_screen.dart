@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import '../Widgets/ProjectTile.dart';
+import '../Widgets/project_tile.dart';
 
 
 class ProjectListScreen extends StatefulWidget {

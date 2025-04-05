@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../Models/ChatMessage.dart';
-import '../Widgets/ChatBubble.dart';
+import '../Widgets/chat_bubble.dart';
 
 class LLMInterface extends StatefulWidget {
   @override
