@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart'; // Statt Storage
 import '../Widgets/project_tile.dart';
-
 
 class ProjectListScreen extends StatefulWidget {
   const ProjectListScreen({super.key});
@@ -12,6 +10,7 @@ class ProjectListScreen extends StatefulWidget {
 }
 
 class _ProjectListScreenState extends State<ProjectListScreen> {
+  final DatabaseReference _db = FirebaseDatabase.instance.ref(); // Realtime DB Referenz
   List<Map<String, dynamic>> projects = [];
   bool _isInitialized = false;
 
@@ -24,25 +23,27 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
-      _fetchProjectsFromStorage();
+      _fetchProjectsFromDatabase(); // Anpassung: von Storage zu Database
       _isInitialized = true;
     }
   }
 
-  Future<void> _fetchProjectsFromStorage() async {
+  // Projekte aus der Realtime Database laden
+  Future<void> _fetchProjectsFromDatabase() async {
     try {
-      final ref = FirebaseStorage.instance.ref().child('files/');
-      final result = await ref.listAll();
-
-      setState(() {
-        projects = result.prefixes.map((Reference folderRef) {
-          return {
-            'name': folderRef.name,
-            'id': folderRef.name,
-            'files': [],
-          };
-        }).toList();
-      });
+      final snapshot = await _db.child('files').get(); // Holt alle Projekte unter 'files'
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        setState(() {
+          projects = data.entries.map((entry) {
+            return {
+              'name': entry.key.toString(),
+              'id': entry.key.toString(),
+              'files': [], // Dateien werden ggf. separat geladen
+            };
+          }).toList();
+        });
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -53,10 +54,11 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     }
   }
 
+  // Neues Projekt in der Realtime Database anlegen
   Future<void> _addProject(String projectName) async {
     try {
-      final ref = FirebaseStorage.instance.ref().child('files/$projectName/.keep');
-      await ref.putString('');
+      final path = 'files/$projectName';
+      await _db.child(path).set({}); // Leeren Knoten erstellen
 
       setState(() {
         projects.add({
@@ -82,23 +84,13 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     }
   }
 
-  void _deleteProject(String id) async {
+  // Projekt und alle untergeordneten Dateien aus der Realtime Database löschen
+  Future<void> _deleteProject(String id) async {
     try {
-      final projectIndex = projects.indexWhere((project) => project['id'] == id);
-      if (projectIndex == -1) {
-        throw Exception('Projekt mit ID $id nicht gefunden');
-      }
-
-      final projectName = projects[projectIndex]['name'];
-      final ref = FirebaseStorage.instance.ref().child('files/$projectName');
-
-      final result = await ref.listAll();
-      for (var fileRef in result.items) {
-        await fileRef.delete();
-      }
+      await _db.child('files/$id').remove(); // Projektknoten komplett löschen
 
       setState(() {
-        projects.removeAt(projectIndex);
+        projects.removeWhere((project) => project['id'] == id);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,7 +132,7 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
           TextButton(
             onPressed: () {
               if (controller.text.isNotEmpty) {
-                _addProject(controller.text);
+                _addProject(controller.text.trim());
                 Navigator.pop(context);
               }
             },
@@ -166,12 +158,16 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: ListView.builder(
             padding: const EdgeInsets.all(8.0),
             itemCount: projects.length,
             itemBuilder: (context, index) {
-              return ProjectTile(projects[index],_viewProject,_deleteProject, );
+              return ProjectTile(
+                projects[index],
+                _viewProject,
+                _deleteProject,
+              );
             },
           ),
         ),

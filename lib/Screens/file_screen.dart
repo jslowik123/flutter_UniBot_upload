@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../Widgets/file_tile.dart';
@@ -22,40 +22,36 @@ class _FileScreenState extends State<FileScreen> {
   bool _isInitialized = false;
   bool _isLoading = false;
   String? _uploadStatus;
-
-  @override
-  void initState() {
-    super.initState();
-  }
+  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  Map<String, dynamic>? _routeArgs; // ✅ Argumente zwischenspeichern
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
-      _fetchFilesFromStorage();
+      _routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _fetchFilesFromDatabase();
       _isInitialized = true;
     }
   }
 
-  Future<void> _fetchFilesFromStorage() async {
-    final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    if (routeArgs == null) return;
-
-    final projectName = routeArgs['name'] ?? 'unbekannt';
-    final storagePath = 'files/$projectName/';
+  Future<void> _fetchFilesFromDatabase() async {
+    final projectName = _routeArgs?['name'] ?? 'unbekannt';
+    final databasePath = 'files/$projectName';
 
     try {
-      final ref = FirebaseStorage.instance.ref().child(storagePath);
-      final result = await ref.listAll();
-
-      setState(() {
-        _importedFiles = result.items
-            .map((Reference fileRef) {
-          return {'name': fileRef.name, 'path': fileRef.fullPath};
-        })
-            .toList();
-      });
+      final snapshot = await _db.child(databasePath).get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        setState(() {
+          _importedFiles = data.entries
+              .map((entry) => {
+            'name': entry.value['name'] as String,
+            'path': '$databasePath/${entry.key}'
+          })
+              .toList();
+        });
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -88,56 +84,16 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _uploadFileToFirebase() async {
-    if (_filePath == null || _fileName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fehler: Keine Datei zum Hochladen ausgewählt'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-
-    if (routeArgs == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fehler: Keine Projektinformationen verfügbar'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final file = File(_filePath!);
-    final path = 'files/${routeArgs["name"]}/$_fileName';
-    final ref = FirebaseStorage.instance.ref().child(path);
+  Future<String?> _saveFileNameToDatabase(String fileName) async {
+    final projectName = _routeArgs?['name'] ?? 'unbekannt';
+    final databasePath = 'files/$projectName';
 
     try {
-      await ref.putFile(file);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Datei $_fileName erfolgreich hochgeladen!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      setState(() {
-        _filePicked = false;
-        _importedFiles.add({'name': _fileName!, 'path': path});
-        _filePath = null;
-        _fileName = null;
-      });
+      final newFileRef = _db.child(databasePath).push();
+      await newFileRef.set({'name': fileName});
+      return newFileRef.key;
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Hochladen: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      throw Exception('Fehler beim Speichern des Dateinamens: $e');
     }
   }
 
@@ -161,7 +117,7 @@ class _FileScreenState extends State<FileScreen> {
       final file = File(_filePath!);
       final fileBytes = await file.readAsBytes();
 
-      var uri = Uri.parse('http://deine-api-url/upload'); // Ersetze mit deiner API-URL
+      var uri = null;//Uri.parse('https://flutter-test-f9ed4-default-rtdb.europe-west1.firebasedatabase.app/');
 
       var request = http.MultipartRequest('POST', uri)
         ..files.add(
@@ -175,30 +131,31 @@ class _FileScreenState extends State<FileScreen> {
       var response = await request.send();
       var responseString = await response.stream.bytesToString();
 
-      setState(() {
-        _isLoading = false;
-        if (response.statusCode == 200) {
-          _uploadStatus = 'API-Upload erfolgreich: $responseString';
+      if (response.statusCode == 200) {
+        await _saveFileNameToDatabase(_fileName!);
+
+        setState(() {
+          _uploadStatus = 'Upload erfolgreich: $responseString';
           _filePicked = false;
           _importedFiles.add({'name': _fileName!, 'path': _filePath!});
           _filePath = null;
           _fileName = null;
-        } else {
-          _uploadStatus = 'API-Upload fehlgeschlagen: ${response.statusCode}';
-        }
-      });
+        });
+      } else {
+        setState(() {
+          _uploadStatus = 'Upload fehlgeschlagen: ${response.statusCode}';
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_uploadStatus!),
-          backgroundColor:
-          response.statusCode == 200 ? Colors.green : Colors.red,
+          backgroundColor: response.statusCode == 200 ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
       setState(() {
-        _isLoading = false;
-        _uploadStatus = 'Fehler beim API-Upload: $e';
+        _uploadStatus = 'Fehler beim Upload: $e';
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -206,71 +163,29 @@ class _FileScreenState extends State<FileScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  Future<void> _deleteFileFromFirebase(String path) async {
+  Future<void> _deleteFileFromDatabase(String path) async {
     try {
-      final ref = FirebaseStorage.instance.ref().child(path);
-      await ref.delete();
+      await _db.child(path).remove();
       setState(() {
         _importedFiles.removeWhere((file) => file['path'] == path);
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Datei erfolgreich aus Firebase gelöscht'),
+          content: Text('Datei erfolgreich aus Database gelöscht'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Fehler beim Löschen aus Firebase: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _deleteFileFromApi(String fileName) async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      var uri = Uri.parse('http://deine-api-url/delete'); // Ersetze mit deiner API-URL
-      var response = await http.delete(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'file': fileName}), // Dateiname genau wie beim Upload
-      );
-
-      setState(() {
-        _isLoading = false;
-        if (response.statusCode == 200) {
-          _importedFiles.removeWhere((file) => file['name'] == fileName);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Datei erfolgreich aus API gelöscht'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('API-Löschung fehlgeschlagen: ${response.statusCode}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim API-Löschen: $e'),
+          content: Text('Fehler beim Löschen aus Database: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -278,13 +193,13 @@ class _FileScreenState extends State<FileScreen> {
   }
 
   Future<void> _deleteFile(String path, String fileName) async {
-    await _deleteFileFromFirebase(path);
-    await _deleteFileFromApi(fileName);
+    await _deleteFileFromDatabase(path);
+    // await _deleteFileFromApi(fileName); // optional
   }
 
   void _confirmSelection() {
     if (_filePath != null && _fileName != null) {
-      _uploadFileToApi(); // oder _uploadFileToFirebase();
+      _uploadFileToApi();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -301,9 +216,7 @@ class _FileScreenState extends State<FileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final routeArgs =
-    ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final projectName = routeArgs?['name'] ?? "unbekannt";
+    final projectName = _routeArgs?['name'] ?? "unbekannt";
 
     return Scaffold(
       appBar: AppBar(
@@ -311,13 +224,13 @@ class _FileScreenState extends State<FileScreen> {
         actions: [
           IconButton(
             onPressed: () => _changeToChat(context),
-            icon: Icon(Icons.chat),
+            icon: const Icon(Icons.chat),
           ),
         ],
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
             children: [
               ListView.builder(
@@ -343,7 +256,7 @@ class _FileScreenState extends State<FileScreen> {
                 ),
               ),
               if (_isLoading)
-                Center(
+                const Center(
                   child: CircularProgressIndicator(),
                 ),
             ],
