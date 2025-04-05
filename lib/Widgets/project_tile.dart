@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' show BorderRadius, BorderSide, BuildContext, Card, CircleAvatar, Colors, EdgeInsets, FontWeight, Icon, IconButton, Icons, ListTile, MainAxisSize, RoundedRectangleBorder, Row, ScaffoldMessenger, SnackBar, StatelessWidget, Text, TextStyle, Widget;
 
 class ProjectTile extends StatelessWidget {
 
@@ -30,7 +30,7 @@ class ProjectTile extends StatelessWidget {
         ),
         title: Text(
           project['name'],
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
           ),

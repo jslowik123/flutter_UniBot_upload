@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:ui' show Offset, TextAlign;
 
-class newFile extends StatelessWidget {
+class NewFile extends StatelessWidget {
   final String? fileName;
-  final Future<void> Function() pickFileFunc; // Korrigierter Typ: Funktion, die Future<void> zurückgibt
+  final Future<void> Function() pickFileFunc;
   final VoidCallback confirmSelectionFunc;
   final bool filePicked;
 
-  const newFile({
+  const NewFile({
     required this.fileName,
     required this.pickFileFunc,
     required this.confirmSelectionFunc,
@@ -22,7 +23,7 @@ class newFile extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.3),
+            color: Color.fromRGBO(158, 158, 158, 0.3),
             spreadRadius: 2,
             blurRadius: 5,
             offset: const Offset(0, -3),
@@ -36,7 +37,7 @@ class newFile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: pickFileFunc, // Direkte Übergabe der Funktion
+                onPressed: pickFileFunc,
                 icon: const Icon(Icons.upload_file),
                 label: const Text('Datei auswählen'),
                 style: ElevatedButton.styleFrom(

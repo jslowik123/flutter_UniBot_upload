@@ -335,7 +335,7 @@ class _FileScreenState extends State<FileScreen> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: newFile(
+                child: NewFile(
                   fileName: _fileName,
                   pickFileFunc: _pickFile,
                   confirmSelectionFunc: _confirmSelection,
