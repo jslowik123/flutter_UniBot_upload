@@ -14,7 +14,7 @@ class FileTile extends StatelessWidget {
         color: Colors.blue,
       ),
       title: Text(file['name']!),
-      subtitle: Text(file['path']!),
+      subtitle: Text("Am ${file['date']} hochgeladen."),
       trailing: IconButton(
         icon: const Icon(Icons.delete, color: Colors.red),
         onPressed: deleteFileFunc,

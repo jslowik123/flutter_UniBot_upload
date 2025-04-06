@@ -5,10 +5,15 @@ class ProjectTile extends StatelessWidget {
   final Map<String, dynamic> project;
   final Function viewProjectFunc;
   final Function deleteProjectFunc;
+  final Function editProjectFunc;
 
-  const ProjectTile(this.project, this.viewProjectFunc, this.deleteProjectFunc);
+  const ProjectTile(this.project, this.viewProjectFunc, this.deleteProjectFunc, this.editProjectFunc);
+
   @override
   Widget build(BuildContext context) {
+    // Datum aus den Projekt-Daten holen
+    final String? date = project['data']?['date'];
+
     return Card(
       elevation: 4,
       margin: const EdgeInsets.symmetric(vertical: 6.0),
@@ -35,8 +40,9 @@ class ProjectTile extends StatelessWidget {
             fontSize: 16,
           ),
         ),
-        subtitle: const Text(
-          'Projekt Details',
+        // Ersetze den Text 'Projekt Details' mit dem Datum
+        subtitle: Text(
+          date ?? 'Kein Datum verfügbar',  // Falls kein Datum vorhanden ist, wird dieser Text angezeigt
           style: TextStyle(color: Colors.grey),
         ),
         trailing: Row(
@@ -45,15 +51,14 @@ class ProjectTile extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("${project['name']} bearbeiten")),
-                );
+                editProjectFunc(project['name']); // Projekt umbenennen
               },
               tooltip: 'Projekt bearbeiten',
             ),
+
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.redAccent),
-              onPressed: () => deleteProjectFunc(project["id"]),
+              onPressed: () => deleteProjectFunc(project["name"]),
               tooltip: 'Projekt löschen',
             ),
           ],

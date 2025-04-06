@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../Widgets/file_tile.dart';
 import '../Widgets/new_file.dart';
+import 'package:intl/intl.dart';
 
 class FileScreen extends StatefulWidget {
   const FileScreen({super.key});
@@ -21,9 +22,8 @@ class _FileScreenState extends State<FileScreen> {
   List<Map<String, String>> _importedFiles = [];
   bool _isInitialized = false;
   bool _isLoading = false;
-  String? _uploadStatus;
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  Map<String, dynamic>? _routeArgs; // ✅ Argumente zwischenspeichern
+  Map<String, dynamic>? _routeArgs;
 
   @override
   void didChangeDependencies() {
@@ -35,6 +35,12 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
+  String getFormattedDate() {
+    final DateTime now = DateTime.now();
+    final DateFormat formatter = DateFormat('dd.MM.yyyy');
+    return formatter.format(now);
+  }
+
   Future<void> _fetchFilesFromDatabase() async {
     final projectName = _routeArgs?['name'] ?? 'unbekannt';
     final databasePath = 'files/$projectName';
@@ -43,13 +49,21 @@ class _FileScreenState extends State<FileScreen> {
       final snapshot = await _db.child(databasePath).get();
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
+
+        final List<Map<String, String>> loadedFiles = [];
+
+        data.forEach((key, value) {
+          if (value is Map && value.containsKey('name') && value.containsKey('date')) {
+            loadedFiles.add({
+              'name': value['name'] as String,
+              'path': '$databasePath/$key',
+              'date': value['date'] as String,
+            });
+          }
+        });
+
         setState(() {
-          _importedFiles = data.entries
-              .map((entry) => {
-            'name': entry.value['name'] as String,
-            'path': '$databasePath/${entry.key}'
-          })
-              .toList();
+          _importedFiles = loadedFiles;
         });
       }
     } catch (e) {
@@ -84,90 +98,45 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<String?> _saveFileNameToDatabase(String fileName) async {
+  Future<String?> _uploadFileToFirebase(String fileName, String filePath) async {
     final projectName = _routeArgs?['name'] ?? 'unbekannt';
     final databasePath = 'files/$projectName';
 
     try {
-      final newFileRef = _db.child(databasePath).push();
-      await newFileRef.set({'name': fileName});
-      return newFileRef.key;
+      Map<String, dynamic> data = {
+        'name': fileName,
+        'path': filePath,
+        'date': getFormattedDate(),
+      };
+
+      DatabaseReference newFileRef = _db.child(databasePath).push();
+      await newFileRef.set(data);
+
+      setState(() {
+        _importedFiles.add({
+          'name': fileName,
+          'path': '$databasePath/${newFileRef.key}',
+          'date': data['date'],
+        });
+        _filePicked = false;
+        _fileName = null;
+        _filePath = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Datei erfolgreich hochgeladen')),
+      );
+      return null;
     } catch (e) {
-      throw Exception('Fehler beim Speichern des Dateinamens: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Upload: $e')),
+      );
+      return e.toString();
     }
   }
 
-  Future<void> _uploadFileToApi() async {
-    if (_filePath == null || _fileName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fehler: Keine Datei zum Hochladen ausgewählt'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    try {
-      setState(() {
-        _isLoading = true;
-        _uploadStatus = null;
-      });
-
-      final file = File(_filePath!);
-      final fileBytes = await file.readAsBytes();
-
-      var uri = null;//Uri.parse('https://flutter-test-f9ed4-default-rtdb.europe-west1.firebasedatabase.app/');
-
-      var request = http.MultipartRequest('POST', uri)
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'file',
-            fileBytes,
-            filename: _fileName,
-          ),
-        );
-
-      var response = await request.send();
-      var responseString = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        await _saveFileNameToDatabase(_fileName!);
-
-        setState(() {
-          _uploadStatus = 'Upload erfolgreich: $responseString';
-          _filePicked = false;
-          _importedFiles.add({'name': _fileName!, 'path': _filePath!});
-          _filePath = null;
-          _fileName = null;
-        });
-      } else {
-        setState(() {
-          _uploadStatus = 'Upload fehlgeschlagen: ${response.statusCode}';
-        });
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_uploadStatus!),
-          backgroundColor: response.statusCode == 200 ? Colors.green : Colors.red,
-        ),
-      );
-    } catch (e) {
-      setState(() {
-        _uploadStatus = 'Fehler beim Upload: $e';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_uploadStatus!),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  Future<void> _uploadFileToPinecone() async {
+    return;
   }
 
   Future<void> _deleteFileFromDatabase(String path) async {
@@ -194,12 +163,11 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<void> _deleteFile(String path, String fileName) async {
     await _deleteFileFromDatabase(path);
-    // await _deleteFileFromApi(fileName); // optional
   }
 
   void _confirmSelection() {
     if (_filePath != null && _fileName != null) {
-      _uploadFileToApi();
+      _uploadFileToFirebase(_fileName!, _filePath!);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -232,8 +200,8 @@ class _FileScreenState extends State<FileScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
-            children: [
-              ListView.builder(
+            children: [_importedFiles.isEmpty ? const Center(child: Text('Keine Dateien vorhanden.', ))
+              : ListView.builder(
                 padding: const EdgeInsets.only(bottom: 120.0),
                 itemCount: _importedFiles.length,
                 itemBuilder: (context, index) {
