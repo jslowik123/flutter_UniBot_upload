@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'dart:ui' show Offset, TextAlign;
 
 class NewFile extends StatelessWidget {
   final String? fileName;

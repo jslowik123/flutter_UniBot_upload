@@ -4,9 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import '../Widgets/file_tile.dart';
-import '../Widgets/new_file.dart';
 import 'package:intl/intl.dart';
+
+import '/Widgets/file_tile.dart';
+import '/Widgets/new_file.dart';
 
 class FileScreen extends StatefulWidget {
   const FileScreen({super.key});
@@ -24,6 +25,7 @@ class _FileScreenState extends State<FileScreen> {
   bool _isLoading = false;
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
   Map<String, dynamic>? _routeArgs;
+  late File _file;
 
   @override
   void didChangeDependencies() {
@@ -49,9 +51,7 @@ class _FileScreenState extends State<FileScreen> {
       final snapshot = await _db.child(databasePath).get();
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
-
         final List<Map<String, String>> loadedFiles = [];
-
         data.forEach((key, value) {
           if (value is Map && value.containsKey('name') && value.containsKey('date')) {
             loadedFiles.add({
@@ -61,17 +61,13 @@ class _FileScreenState extends State<FileScreen> {
             });
           }
         });
-
         setState(() {
           _importedFiles = loadedFiles;
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Abrufen der Dateien: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Fehler beim Abrufen der Dateien: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -83,8 +79,8 @@ class _FileScreenState extends State<FileScreen> {
         allowedExtensions: ['pdf'],
         allowMultiple: false,
       );
-
       if (result != null) {
+        _file = File(result.files.single.path!);
         setState(() {
           _filePath = result.files.single.path;
           _fileName = result.files.single.name;
@@ -135,8 +131,46 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _uploadFileToPinecone() async {
-    return;
+  Future<void> _uploadFileToPinecone(File file) async {
+    setState(() => _isLoading = true);
+    try {
+      // API-Endpunkt für Pinecone-Upload
+      var uri = Uri.parse('http://127.0.0.1:8000/upload'); // Angepasste URL
+
+      // Multipart-Request erstellen
+      var request = http.MultipartRequest('POST', uri)
+        ..files.add(await http.MultipartFile.fromPath(
+          'file', // Übereinstimmung mit Backend-Parameter
+          file.path,
+          filename: file.path.split('/').last,
+        ));
+
+      // Request senden
+      var response = await request.send();
+      var responseData = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        var jsonResponse = jsonDecode(responseData);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(jsonResponse['message'] ?? 'Upload zu Pinecone erfolgreich'),
+            backgroundColor: Colors.green,
+
+          ),
+        );
+      } else {
+        throw Exception('Upload fehlgeschlagen: ${response.statusCode} - $responseData');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Fehler beim Pinecone-Upload: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _deleteFileFromDatabase(String path) async {
@@ -146,17 +180,11 @@ class _FileScreenState extends State<FileScreen> {
         _importedFiles.removeWhere((file) => file['path'] == path);
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Datei erfolgreich aus Database gelöscht'),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text('Datei erfolgreich aus Database gelöscht'), backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Löschen aus Database: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Fehler beim Löschen aus Database: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -165,15 +193,13 @@ class _FileScreenState extends State<FileScreen> {
     await _deleteFileFromDatabase(path);
   }
 
-  void _confirmSelection() {
+  void _confirmSelection() async{
     if (_filePath != null && _fileName != null) {
       _uploadFileToFirebase(_fileName!, _filePath!);
+      await _uploadFileToPinecone(_file);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Fehler: Bitte wählen Sie zuerst eine Datei aus'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Fehler: Bitte wählen Sie zuerst eine Datei aus'), backgroundColor: Colors.red),
       );
     }
   }
@@ -200,8 +226,10 @@ class _FileScreenState extends State<FileScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
-            children: [_importedFiles.isEmpty ? const Center(child: Text('Keine Dateien vorhanden.', ))
-              : ListView.builder(
+            children: [
+              _importedFiles.isEmpty
+                  ? const Center(child: Text('Keine Dateien vorhanden.'))
+                  : ListView.builder(
                 padding: const EdgeInsets.only(bottom: 120.0),
                 itemCount: _importedFiles.length,
                 itemBuilder: (context, index) {
@@ -224,9 +252,7 @@ class _FileScreenState extends State<FileScreen> {
                 ),
               ),
               if (_isLoading)
-                const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),
