@@ -5,21 +5,27 @@ import '../Models/ChatMessage.dart';
 import '../Widgets/chat_bubble.dart';
 
 class LLMInterface extends StatefulWidget {
+  const LLMInterface({super.key});
+
   @override
   _LLMInterfaceState createState() => _LLMInterfaceState();
 }
 
 class _LLMInterfaceState extends State<LLMInterface> {
   final TextEditingController _controller = TextEditingController();
-  List<ChatMessage> _messages = [];
+  final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   final String _baseUrl = 'http://localhost:8000';
   bool _botStarted = false;
 
+  @override
+  void initState() {
+    super.initState();
+    startBot();
+  }
+
   Future<void> startBot() async {
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:8000/start_bot'),
-    );
+    final response = await http.post(Uri.parse('$_baseUrl/start_bot'));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -29,13 +35,19 @@ class _LLMInterfaceState extends State<LLMInterface> {
     }
   }
 
-
   Future<void> _sendMessage() async {
+    if (!_botStarted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bot wurde noch nicht gestartet!')),
+      );
+      return;
+    }
+
     final prompt = _controller.text.trim();
     if (prompt.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Bitte gib einen Prompt ein!')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Bitte gib einen Prompt ein!')),
+      );
       return;
     }
 
@@ -46,9 +58,9 @@ class _LLMInterfaceState extends State<LLMInterface> {
 
     try {
       final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/generate'),
+        Uri.parse('$_baseUrl/send_message'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'prompt': prompt}),
+        body: jsonEncode({'user_input': prompt}),
       );
 
       if (response.statusCode == 200) {
