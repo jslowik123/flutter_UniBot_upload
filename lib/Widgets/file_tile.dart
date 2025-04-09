@@ -4,15 +4,12 @@ class FileTile extends StatelessWidget {
   final Map<String, String> file;
   final Future<void> Function() deleteFileFunc;
 
-  const FileTile(this.file, this.deleteFileFunc);
+  const FileTile({super.key, required this.file, required this.deleteFileFunc});
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: const Icon(
-        Icons.insert_drive_file,
-        color: Colors.blue,
-      ),
+      leading: const Icon(Icons.insert_drive_file, color: Colors.blue),
       title: Text(file['name']!),
       subtitle: Text("Am ${file['date']} hochgeladen."),
       trailing: IconButton(

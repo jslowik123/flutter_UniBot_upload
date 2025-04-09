@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../Models/ChatMessage.dart';
+import '../Models/chat_message.dart';
 import '../Widgets/chat_bubble.dart';
 
 class LLMInterface extends StatefulWidget {
@@ -27,12 +27,14 @@ class LLMInterfaceState extends State<LLMInterface> {
   Future<void> startBot() async {
     try {
       final response = await http.post(Uri.parse('$_baseUrl/start_bot'));
-      
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'success') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Der Bot wurde erfolgreich gestartet!')),
+            const SnackBar(
+              content: Text('Der Bot wurde erfolgreich gestartet!'),
+            ),
           );
           setState(() {
             _botStarted = true;

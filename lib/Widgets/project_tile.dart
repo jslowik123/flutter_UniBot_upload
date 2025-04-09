@@ -6,12 +6,13 @@ class ProjectTile extends StatelessWidget {
   final Function deleteProjectFunc;
   final Function editProjectFunc;
 
-  const ProjectTile(
-    this.project,
-    this.viewProjectFunc,
-    this.deleteProjectFunc,
-    this.editProjectFunc,
-  );
+  const ProjectTile({
+    super.key,
+    required this.project,
+    required this.viewProjectFunc,
+    required this.deleteProjectFunc,
+    required this.editProjectFunc,
+  });
 
   @override
   Widget build(BuildContext context) {

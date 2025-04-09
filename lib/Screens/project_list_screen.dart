@@ -256,10 +256,10 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                     itemCount: _projects.length,
                     itemBuilder: (context, index) {
                       return ProjectTile(
-                        _projects[index],
-                        _viewProject,
-                        _deleteProject,
-                        _editProject,
+                        project: _projects[index],
+                        viewProjectFunc: _viewProject,
+                        deleteProjectFunc: _deleteProject,
+                        editProjectFunc: _editProject,
                       );
                     },
                   ),

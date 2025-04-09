@@ -234,8 +234,8 @@ class _FileScreenState extends State<FileScreen> {
                 itemBuilder: (context, index) {
                   final file = _importedFiles[index];
                   return FileTile(
-                    file,
-                        () => _deleteFile(file['path']!, file['name']!),
+                    file: file,
+                    deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
                   );
                 },
               ),
