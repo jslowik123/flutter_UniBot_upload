@@ -7,6 +7,7 @@ class NewFile extends StatelessWidget {
   final bool filePicked;
 
   const NewFile({
+    super.key,
     required this.fileName,
     required this.pickFileFunc,
     required this.confirmSelectionFunc,

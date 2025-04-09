@@ -8,10 +8,10 @@ class LLMInterface extends StatefulWidget {
   const LLMInterface({super.key});
 
   @override
-  _LLMInterfaceState createState() => _LLMInterfaceState();
+  LLMInterfaceState createState() => LLMInterfaceState();
 }
 
-class _LLMInterfaceState extends State<LLMInterface> {
+class LLMInterfaceState extends State<LLMInterface> {
   final TextEditingController _controller = TextEditingController();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
@@ -25,17 +25,30 @@ class _LLMInterfaceState extends State<LLMInterface> {
   }
 
   Future<void> startBot() async {
-    final response = await http.post(Uri.parse('$_baseUrl/start_bot'));
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      _botStarted = true;
-    } else {
-      throw Exception('Failed to start bot');
+    try {
+      final response = await http.post(Uri.parse('$_baseUrl/start_bot'));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'success') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Der Bot wurde erfolgreich gestartet!')),
+          );
+          setState(() {
+            _botStarted = true;
+          });
+        } else {
+          throw Exception('Failed to start bot');
+        }
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Starten des Bots: $e')),
+      );
     }
   }
 
-  Future<void> _sendMessage() async {
+  Future<void> sendMessage() async {
     if (!_botStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bot wurde noch nicht gestartet!')),
@@ -69,7 +82,7 @@ class _LLMInterfaceState extends State<LLMInterface> {
           _controller.clear();
           _messages.add(
             ChatMessage(text: data['response'], isUserMessage: false),
-          ); // LLM-Antwort hinzufügen
+          );
         });
       } else if (response.statusCode == 401) {
         setState(() {
@@ -104,7 +117,7 @@ class _LLMInterfaceState extends State<LLMInterface> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('LLM Chat'), elevation: 4),
+      appBar: AppBar(title: const Text('LLM Chat'), elevation: 4),
       body: Container(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -138,7 +151,10 @@ class _LLMInterfaceState extends State<LLMInterface> {
                       maxLines: 1,
                     ),
                   ),
-                  IconButton(icon: Icon(Icons.send), onPressed: _sendMessage),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: sendMessage,
+                  ),
                 ],
               ),
             ),

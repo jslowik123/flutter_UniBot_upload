@@ -7,12 +7,12 @@ class ProjectListScreen extends StatefulWidget {
   const ProjectListScreen({super.key});
 
   @override
-  _ProjectListScreenState createState() => _ProjectListScreenState();
+  ProjectListScreenState createState() => ProjectListScreenState();
 }
 
-class _ProjectListScreenState extends State<ProjectListScreen> {
+class ProjectListScreenState extends State<ProjectListScreen> {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child("files");
-  List<Map<String, dynamic>> _projects = [];
+  final List<Map<String, dynamic>> _projects = [];
   bool _isLoading = true;
 
   @override
@@ -20,11 +20,13 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     super.initState();
     _fetchProjects();
   }
+
   String getFormattedDate() {
     final DateTime now = DateTime.now();
     final DateFormat formatter = DateFormat('dd.MM.yyyy');
     return formatter.format(now);
   }
+
   // Projekte und ihre Dateien aus der Realtime Database laden
   Future<void> _fetchProjects() async {
     try {
@@ -37,7 +39,8 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
           data.forEach((key, value) {
             _projects.add({
               'name': key.toString(),
-              'data': value, // Speichert die Daten des Projekts (falls vorhanden)
+              'data':
+                  value, // Speichert die Daten des Projekts (falls vorhanden)
             });
           });
         }
@@ -60,9 +63,7 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
   Future<void> _addProject(String projectName) async {
     try {
       final newProjectRef = _db.child(projectName);
-      await newProjectRef.set({
-        "date": getFormattedDate(),
-      });
+      await newProjectRef.set({"date": getFormattedDate()});
       await _fetchProjects();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -103,10 +104,9 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
 
   // Zu FileScreen navigieren
   void _viewProject(BuildContext context, Map<String, dynamic> project) {
-    Navigator.of(context).pushNamed(
-      '/projectView',
-      arguments: {'name': project['name']},
-    );
+    Navigator.of(
+      context,
+    ).pushNamed('/projectView', arguments: {'name': project['name']});
   }
 
   // Dialog zum Hinzufügen eines neuen Projekts
@@ -115,36 +115,39 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Neues Projekt erstellen'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Projektname eingeben'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Neues Projekt erstellen'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Projektname eingeben',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final name = controller.text.trim();
+                  if (name.isNotEmpty) {
+                    await _addProject(name);
+                    Navigator.pop(context);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Bitte einen Projektname eingeben'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Erstellen'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              final name = controller.text.trim();
-              if (name.isNotEmpty) {
-                await _addProject(name);
-                Navigator.pop(context);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Bitte einen Projektname eingeben'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Erstellen'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -182,43 +185,48 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
     }
   }
 
-
   Future<void> _editProject(String projectName) async {
     final TextEditingController controller = TextEditingController();
-    controller.text = projectName; // Setzt den aktuellen Projektnamen als Standard
+    controller.text =
+        projectName; // Setzt den aktuellen Projektnamen als Standard
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Projekt bearbeiten'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Neuen Projektnamen eingeben'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Abbrechen'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Projekt bearbeiten'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Neuen Projektnamen eingeben',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final newName = controller.text.trim();
+                  if (newName.isNotEmpty && newName != projectName) {
+                    await _updateProjectName(projectName, newName);
+                    Navigator.pop(context);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Bitte einen neuen Projektnamen eingeben',
+                        ),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Ändern'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () async {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != projectName) {
-                await _updateProjectName(projectName, newName);
-                Navigator.pop(context);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Bitte einen neuen Projektnamen eingeben'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: const Text('Ändern'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -238,22 +246,23 @@ class _ProjectListScreenState extends State<ProjectListScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _projects.isEmpty
-              ? const Center(child: Text('Keine Projekte vorhanden'))
-              : ListView.builder(
-            padding: const EdgeInsets.all(8.0),
-            itemCount: _projects.length,
-            itemBuilder: (context, index) {
-              return ProjectTile(
-                _projects[index],
-                _viewProject,
-                _deleteProject,
-                _editProject,
-              );
-            },
-          ),
+          child:
+              _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _projects.isEmpty
+                  ? const Center(child: Text('Keine Projekte vorhanden'))
+                  : ListView.builder(
+                    padding: const EdgeInsets.all(8.0),
+                    itemCount: _projects.length,
+                    itemBuilder: (context, index) {
+                      return ProjectTile(
+                        _projects[index],
+                        _viewProject,
+                        _deleteProject,
+                        _editProject,
+                      );
+                    },
+                  ),
         ),
       ),
     );

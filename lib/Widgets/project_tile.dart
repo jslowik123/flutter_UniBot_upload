@@ -1,13 +1,17 @@
-import 'package:flutter/material.dart' show BorderRadius, BorderSide, BuildContext, Card, CircleAvatar, Colors, EdgeInsets, FontWeight, Icon, IconButton, Icons, ListTile, MainAxisSize, RoundedRectangleBorder, Row, ScaffoldMessenger, SnackBar, StatelessWidget, Text, TextStyle, Widget;
+import 'package:flutter/material.dart';
 
 class ProjectTile extends StatelessWidget {
-
   final Map<String, dynamic> project;
   final Function viewProjectFunc;
   final Function deleteProjectFunc;
   final Function editProjectFunc;
 
-  const ProjectTile(this.project, this.viewProjectFunc, this.deleteProjectFunc, this.editProjectFunc);
+  const ProjectTile(
+    this.project,
+    this.viewProjectFunc,
+    this.deleteProjectFunc,
+    this.editProjectFunc,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -19,30 +23,22 @@ class ProjectTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 6.0),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: Colors.grey.shade300,
-          width: 1.0,
-        ),
+        side: BorderSide(color: Colors.grey.shade300, width: 1.0),
       ),
       child: ListTile(
         onTap: () => viewProjectFunc(context, project),
         leading: CircleAvatar(
           backgroundColor: Colors.blue.shade100,
-          child: const Icon(
-            Icons.work,
-            color: Colors.blueAccent,
-          ),
+          child: const Icon(Icons.work, color: Colors.blueAccent),
         ),
         title: Text(
           project['name'],
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         // Ersetze den Text 'Projekt Details' mit dem Datum
         subtitle: Text(
-          date ?? 'Kein Datum verfügbar',  // Falls kein Datum vorhanden ist, wird dieser Text angezeigt
+          date ??
+              'Kein Datum verfügbar', // Falls kein Datum vorhanden ist, wird dieser Text angezeigt
           style: TextStyle(color: Colors.grey),
         ),
         trailing: Row(
