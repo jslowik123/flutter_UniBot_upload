@@ -27,13 +27,15 @@ class _FileScreenState extends State<FileScreen> {
   Map<String, dynamic>? _routeArgs;
   late File _file;
   final String baseUrl = 'http://127.0.0.1:8000/';
-  
+  String? _projectName;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
       _routeArgs =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _projectName = _routeArgs?['name'];
       _fetchFilesFromDatabase();
       _isInitialized = true;
     }
@@ -140,9 +142,6 @@ class _FileScreenState extends State<FileScreen> {
         _filePath = null;
       });
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Datei erfolgreich hochgeladen')));
       return null;
     } catch (e) {
       ScaffoldMessenger.of(
@@ -152,35 +151,29 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _uploadFileToPinecone(File file) async {
-    setState(() => _isLoading = true);
+  Future<String?> _uploadFileToPinecone(File file) async {
     try {
       var uri = Uri.parse('${baseUrl}upload');
 
       if (kIsWeb) {
         // Web-spezifischer Upload
-        var request = http.MultipartRequest('POST', uri)
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              await file.readAsBytes(),
-              filename: file.path.split('/').last,
-            ),
-          );
+        var request =
+            http.MultipartRequest('POST', uri)
+              ..files.add(
+                http.MultipartFile.fromBytes(
+                  'file',
+                  await file.readAsBytes(),
+                  filename: file.path.split('/').last,
+                ),
+              )
+              ..fields['project_name'] = _projectName ?? 'unbekannt';
 
         var response = await request.send();
         var responseData = await response.stream.bytesToString();
 
         if (response.statusCode == 200) {
           var jsonResponse = jsonDecode(responseData);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                jsonResponse['message'] ?? 'Upload zu Pinecone erfolgreich',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          return null; // Erfolg
         } else {
           throw Exception(
             'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
@@ -188,28 +181,23 @@ class _FileScreenState extends State<FileScreen> {
         }
       } else {
         // Desktop/Mobile Upload
-        var request = http.MultipartRequest('POST', uri)
-          ..files.add(
-            await http.MultipartFile.fromPath(
-              'file',
-              file.path,
-              filename: file.path.split('/').last,
-            ),
-          );
+        var request =
+            http.MultipartRequest('POST', uri)
+              ..files.add(
+                await http.MultipartFile.fromPath(
+                  'file',
+                  file.path,
+                  filename: file.path.split('/').last,
+                ),
+              )
+              ..fields['project_name'] = _projectName ?? 'unbekannt';
 
         var response = await request.send();
         var responseData = await response.stream.bytesToString();
 
         if (response.statusCode == 200) {
           var jsonResponse = jsonDecode(responseData);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                jsonResponse['message'] ?? 'Upload zu Pinecone erfolgreich',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          return null; // Erfolg
         } else {
           throw Exception(
             'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
@@ -217,9 +205,61 @@ class _FileScreenState extends State<FileScreen> {
         }
       }
     } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> _deleteFileFromDatabase(String path) async {
+    try {
+      await _db.child(path).remove();
+      setState(() {
+        _importedFiles.removeWhere((file) => file['path'] == path);
+      });
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> _deleteFileFromPinecone(String fileName) async {
+    try {
+      var uri = Uri.parse('$baseUrl/delete');
+      var request = http.MultipartRequest('POST', uri);
+      request.fields['file_name'] = fileName;
+      request.fields['namespace'] = _projectName!;
+
+      var response = await request.send();
+      if (response.statusCode == 200) {
+        return null;
+      } else {
+        return response.reasonPhrase;
+      }
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<void> _deleteFile(String path, String fileName) async {
+    setState(() => _isLoading = true);
+    try {
+      final databaseError = await _deleteFileFromDatabase(path);
+      final pineconeError = await _deleteFileFromPinecone(fileName);
+      if (databaseError != null) {
+        throw Exception('Database deletion failed: $databaseError');
+      }
+      if (pineconeError != null) {
+        throw Exception('Pinecone deletion failed: $pineconeError');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Datei erfolgreich hochgeladen und verarbeitet'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Fehler beim Pinecone-Upload: $e'),
+          content: Text('Fehler beim Upload: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -228,36 +268,51 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _deleteFileFromDatabase(String path) async {
-    try {
-      await _db.child(path).remove();
-      setState(() {
-        _importedFiles.removeWhere((file) => file['path'] == path);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Datei erfolgreich aus Database gelöscht'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Löschen aus Database: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _deleteFile(String path, String fileName) async {
-    await _deleteFileFromDatabase(path);
-  }
-
   void _confirmSelection() async {
     if (_filePath != null && _fileName != null) {
-      _uploadFileToFirebase(_fileName!, _filePath!);
-      await _uploadFileToPinecone(_file);
+      setState(() => _isLoading = true);
+      try {
+        final pineconeError = await _uploadFileToPinecone(_file);
+        if (pineconeError != null) {
+          _importedFiles.add({
+            'name': "Upload von ${_fileName!} fehlgeschlagen",
+            'path': _filePath!,
+            'date': getFormattedDate(),
+          });
+          setState(() {
+            _filePicked = false;
+            _fileName = null;
+            _filePath = null;
+          });
+          throw Exception('Pinecone upload failed: $pineconeError');
+        }
+        {
+          final firebaseError = await _uploadFileToFirebase(
+            _fileName!,
+            _filePath!,
+          );
+          if (firebaseError != null) {
+            throw Exception('Firebase upload failed: $firebaseError');
+          }
+        }
+
+        // Only show success snackbar if both uploads were successful
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Datei erfolgreich hochgeladen und verarbeitet'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fehler beim Upload: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() => _isLoading = false);
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
