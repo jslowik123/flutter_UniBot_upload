@@ -36,6 +36,7 @@ class _FileScreenState extends State<FileScreen> {
       _routeArgs =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _projectName = _routeArgs?['name'];
+      print('Project name set to: $_projectName');
       _fetchFilesFromDatabase();
       _isInitialized = true;
     }
@@ -153,58 +154,38 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<String?> _uploadFileToPinecone(File file) async {
     try {
-      var uri = Uri.parse('${baseUrl}upload');
+      print('Starte Upload...');
+      print('Verwende Datei: ${file.path}');
 
-      if (kIsWeb) {
-        // Web-spezifischer Upload
-        var request =
-            http.MultipartRequest('POST', uri)
-              ..files.add(
-                http.MultipartFile.fromBytes(
-                  'file',
-                  await file.readAsBytes(),
-                  filename: file.path.split('/').last,
-                ),
-              )
-              ..fields['project_name'] = _projectName ?? 'unbekannt';
+      final uri = Uri.parse('${baseUrl}upload');
+      final request =
+          http.MultipartRequest('POST', uri)
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'file',
+                await file.readAsBytes(),
+                filename: file.path.split('/').last,
+              ),
+            )
+            ..fields['namespace'] = _projectName ?? 'unbekannt';
 
-        var response = await request.send();
-        var responseData = await response.stream.bytesToString();
+      print('Sende Request...');
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
 
-        if (response.statusCode == 200) {
-          var jsonResponse = jsonDecode(responseData);
-          return null; // Erfolg
-        } else {
-          throw Exception(
-            'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
-          );
-        }
+      if (response.statusCode == 200) {
+        print('Upload erfolgreich!');
+        print('Response: $responseData');
+        return null;
       } else {
-        // Desktop/Mobile Upload
-        var request =
-            http.MultipartRequest('POST', uri)
-              ..files.add(
-                await http.MultipartFile.fromPath(
-                  'file',
-                  file.path,
-                  filename: file.path.split('/').last,
-                ),
-              )
-              ..fields['project_name'] = _projectName ?? 'unbekannt';
-
-        var response = await request.send();
-        var responseData = await response.stream.bytesToString();
-
-        if (response.statusCode == 200) {
-          var jsonResponse = jsonDecode(responseData);
-          return null; // Erfolg
-        } else {
-          throw Exception(
-            'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
-          );
-        }
+        print('Upload fehlgeschlagen: ${response.statusCode}');
+        print('Response: $responseData');
+        throw Exception(
+          'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
+        );
       }
     } catch (e) {
+      print('Fehler beim Upload: $e');
       return e.toString();
     }
   }
@@ -223,6 +204,10 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<String?> _deleteFileFromPinecone(String fileName) async {
     try {
+      if (_projectName == null) {
+        return 'Project name is not set';
+      }
+
       var uri = Uri.parse('$baseUrl/delete');
       var request = http.MultipartRequest('POST', uri);
       request.fields['file_name'] = fileName;
@@ -252,7 +237,7 @@ class _FileScreenState extends State<FileScreen> {
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Datei erfolgreich hochgeladen und verarbeitet'),
+          content: Text('Datei erfolgreich gelöscht.'),
           backgroundColor: Colors.green,
         ),
       );
