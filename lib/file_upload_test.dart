@@ -4,13 +4,7 @@ import 'package:http/http.dart' as http;
 void main() async {
   final file = File("test.pdf");
 
-  // Check if file exists
-  if (!await file.exists()) {
-    print('Fehler: Datei nicht gefunden unter test.pdf');
-    return;
-  }
-
-  // Define the base URL for the server
+  // Define the base URL^ for the server
   final baseUrl = 'http://127.0.0.1:8000/';
 
   try {

@@ -154,20 +154,40 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<String?> _uploadFileToPinecone(File file) async {
     try {
+      if (_projectName == null) {
+        print('Fehler: Projektname ist nicht gesetzt');
+        return 'Project name is not set';
+      }
+
       print('Starte Upload...');
       print('Verwende Datei: ${file.path}');
+      print('Verwende Namespace: $_projectName');
 
       final uri = Uri.parse('${baseUrl}upload');
-      final request =
-          http.MultipartRequest('POST', uri)
-            ..files.add(
-              http.MultipartFile.fromBytes(
-                'file',
-                await file.readAsBytes(),
-                filename: file.path.split('/').last,
-              ),
-            )
-            ..fields['namespace'] = _projectName ?? 'unbekannt';
+      final request = http.MultipartRequest('POST', uri);
+
+      if (kIsWeb) {
+        // Für Web: Verwende die Bytes direkt
+        request
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'file',
+              await file.readAsBytes(),
+              filename: file.path.split('/').last,
+            ),
+          )
+          ..fields['namespace'] = 'test456';
+      } else {
+        // Für Desktop/Mobile
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            file.path,
+            filename: file.path.split('/').last,
+          ),
+        );
+        request.fields['namespace'] = _projectName!;
+      }
 
       print('Sende Request...');
       final response = await request.send();
