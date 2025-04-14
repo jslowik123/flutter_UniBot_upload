@@ -335,10 +335,12 @@ class _FileScreenState extends State<FileScreen> {
   @override
   Widget build(BuildContext context) {
     final projectName = _routeArgs?['name'] ?? "unbekannt";
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(projectName),
+        title: Text(projectName, style: theme.textTheme.titleLarge),
         actions: [
           IconButton(
             onPressed: () => _changeToChat(context),
@@ -352,16 +354,24 @@ class _FileScreenState extends State<FileScreen> {
           child: Stack(
             children: [
               _importedFiles.isEmpty
-                  ? const Center(child: Text('Keine Dateien vorhanden.'))
+                  ? Center(
+                    child: Text(
+                      'Keine Dateien vorhanden.',
+                      style: theme.textTheme.bodyLarge,
+                    ),
+                  )
                   : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 120.0),
                     itemCount: _importedFiles.length,
                     itemBuilder: (context, index) {
                       final file = _importedFiles[index];
-                      return FileTile(
-                        file: file,
-                        deleteFileFunc:
-                            () => _deleteFile(file['path']!, file['name']!),
+                      return Card(
+                        color: colorScheme.surface,
+                        child: FileTile(
+                          file: file,
+                          deleteFileFunc:
+                              () => _deleteFile(file['path']!, file['name']!),
+                        ),
                       );
                     },
                   ),

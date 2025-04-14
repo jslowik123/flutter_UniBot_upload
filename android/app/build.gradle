@@ -1,0 +1,8 @@
+buildTypes {
+    release {
+        signingConfig signingConfigs.debug
+        minifyEnabled true
+        shrinkResources true
+        proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+    }
+} 
