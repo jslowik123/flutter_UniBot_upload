@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
 import '../Widgets/project_tile.dart';
-import 'package:intl/intl.dart';
+import '../Services/project_service.dart';
+import '../Services/snackbar_service.dart';
 
 class ProjectListScreen extends StatefulWidget {
   const ProjectListScreen({super.key});
@@ -11,7 +11,7 @@ class ProjectListScreen extends StatefulWidget {
 }
 
 class ProjectListScreenState extends State<ProjectListScreen> {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref().child("files");
+  final ProjectService _projectService = ProjectService();
   final List<Map<String, dynamic>> _projects = [];
   bool _isLoading = true;
 
@@ -21,95 +21,83 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     _fetchProjects();
   }
 
-  String getFormattedDate() {
-    final DateTime now = DateTime.now();
-    final DateFormat formatter = DateFormat('dd.MM.yyyy');
-    return formatter.format(now);
-  }
-
-  // Projekte und ihre Dateien aus der Realtime Database laden
   Future<void> _fetchProjects() async {
     try {
-      final snapshot = await _db.once();
-      final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
-
+      final projects = await _projectService.fetchProjects();
       setState(() {
         _projects.clear();
-        if (data != null) {
-          data.forEach((key, value) {
-            _projects.add({
-              'name': key.toString(),
-              'data':
-                  value, // Speichert die Daten des Projekts (falls vorhanden)
-            });
-          });
-        }
+        _projects.addAll(projects);
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Laden der Projekte: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      SnackbarService.showError(context, 'Fehler beim Laden der Projekte: $e');
     }
   }
 
-  // Neues Projekt zur Realtime Database hinzufügen
   Future<void> _addProject(String projectName) async {
     try {
-      final newProjectRef = _db.child(projectName);
-      await newProjectRef.set({"date": getFormattedDate()});
+      await _projectService.addProject(projectName);
       await _fetchProjects();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Projekt "$projectName" erstellt'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SnackbarService.showSuccess(context, 'Projekt "$projectName" erstellt');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Erstellen des Projekts: $e'),
-          backgroundColor: Colors.red,
-        ),
+      SnackbarService.showError(
+        context,
+        'Fehler beim Erstellen des Projekts: $e',
       );
     }
   }
 
-  // Projekt und alle zugehörigen Dateien löschen
   Future<void> _deleteProject(String projectName) async {
     try {
-      await _db.child(projectName).remove();
-      await _fetchProjects(); // Projekte neu laden nach dem Löschen
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Projekt gelöscht'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      await _projectService.deleteProject(projectName);
+      await _fetchProjects();
+      SnackbarService.showSuccess(context, 'Projekt gelöscht');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Löschen des Projekts: $e'),
-          backgroundColor: Colors.red,
-        ),
+      SnackbarService.showError(
+        context,
+        'Fehler beim Löschen des Projekts: $e',
       );
     }
   }
 
-  // Zu FileScreen navigieren
+  void _showDeleteConfirmationDialog(String projectName) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Projekt löschen'),
+            content: Text(
+              'Möchten Sie das Projekt "$projectName" wirklich löschen?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await _deleteProject(projectName);
+                },
+                child: const Text(
+                  'Löschen',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _viewProject(BuildContext context, Map<String, dynamic> project) {
     Navigator.of(
       context,
     ).pushNamed('/projectView', arguments: {'name': project['name']});
   }
 
-  // Dialog zum Hinzufügen eines neuen Projekts
   void _showAddProjectDialog() {
     final TextEditingController controller = TextEditingController();
 
@@ -136,11 +124,9 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                     await _addProject(name);
                     Navigator.pop(context);
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Bitte einen Projektname eingeben'),
-                        backgroundColor: Colors.red,
-                      ),
+                    SnackbarService.showError(
+                      context,
+                      'Bitte einen Projektname eingeben',
                     );
                   }
                 },
@@ -151,44 +137,25 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     );
   }
 
-  // Funktion zum Ändern des Projektnamens in Firebase
   Future<void> _updateProjectName(String oldName, String newName) async {
     try {
-      final oldProjectRef = _db.child(oldName);
-      final newProjectRef = _db.child(newName);
-
-      // Kopiere die Daten von alt nach neu
-      final snapshot = await oldProjectRef.once();
-      final data = snapshot.snapshot.value as Map<dynamic, dynamic>;
-
-      // Setze die neuen Projekt-Daten unter dem neuen Namen
-      await newProjectRef.set(data);
-
-      // Lösche das alte Projekt
-      await oldProjectRef.remove();
-
-      await _fetchProjects(); // Projekte neu laden nach dem Umbenennen
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Projekt "$newName" wurde umbenannt'),
-          backgroundColor: Colors.green,
-        ),
+      await _projectService.updateProjectName(oldName, newName);
+      await _fetchProjects();
+      SnackbarService.showSuccess(
+        context,
+        'Projekt "$newName" wurde umbenannt',
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Fehler beim Umbenennen des Projekts: $e'),
-          backgroundColor: Colors.red,
-        ),
+      SnackbarService.showError(
+        context,
+        'Fehler beim Umbenennen des Projekts: $e',
       );
     }
   }
 
   Future<void> _editProject(String projectName) async {
     final TextEditingController controller = TextEditingController();
-    controller.text =
-        projectName; // Setzt den aktuellen Projektnamen als Standard
+    controller.text = projectName;
 
     showDialog(
       context: context,
@@ -213,13 +180,9 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                     await _updateProjectName(projectName, newName);
                     Navigator.pop(context);
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Bitte einen neuen Projektnamen eingeben',
-                        ),
-                        backgroundColor: Colors.red,
-                      ),
+                    SnackbarService.showError(
+                      context,
+                      'Bitte einen neuen Projektnamen eingeben',
                     );
                   }
                 },
@@ -232,8 +195,6 @@ class ProjectListScreenState extends State<ProjectListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Projekte'),
@@ -260,7 +221,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                       return ProjectTile(
                         project: _projects[index],
                         viewProjectFunc: _viewProject,
-                        deleteProjectFunc: _deleteProject,
+                        deleteProjectFunc: _showDeleteConfirmationDialog,
                         editProjectFunc: _editProject,
                       );
                     },

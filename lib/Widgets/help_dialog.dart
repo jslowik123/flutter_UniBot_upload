@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'help_content.dart';
 
 class HelpDialog {
   void showHelpDialog(context) {
@@ -10,106 +11,104 @@ class HelpDialog {
       builder:
           (context) => StatefulBuilder(
             builder:
-                (context, setState) => AlertDialog(
-                  title: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Hilfe (${currentPage + 1}/3)'),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                (context, setState) => ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 1000,
+                    maxHeight: 1000,
+                    minHeight: 1000,
+                    minWidth: 1000,
                   ),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    child: PageView(
-                      controller: pageController,
-                      onPageChanged: (index) {
-                        setState(() => currentPage = index);
-                      },
-                      children: const [
-                        // Erste Seite
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Dateien hochladen',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text('1. Wählen Sie eine PDF-Datei aus'),
-                            Text('2. Bestätigen Sie die Auswahl'),
-                            Text('3. Die Datei wird automatisch hochgeladen'),
-                          ],
+                  child: AlertDialog(
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Hilfe (${currentPage + 1}/${HelpContent.pages.length})',
                         ),
-                        // Zweite Seite
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Dateiverwaltung',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text('• Dateien werden in der Liste angezeigt'),
-                            Text('• Löschen über das Mülleimer-Symbol'),
-                            Text(
-                              '• Alle Dateien werden im Projekt gespeichert',
-                            ),
-                          ],
-                        ),
-                        // Dritte Seite
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Zusätzliche Funktionen',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text('• Automatische Verarbeitung der PDFs'),
-                            Text('• Einfache Navigation zwischen Projekten'),
-                            Text('• Schnelle Suche in allen Dokumenten'),
-                          ],
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
                         ),
                       ],
                     ),
+                    content: SizedBox(
+                      width: 600,
+                      height: 500,
+                      child: PageView(
+                        controller: pageController,
+                        onPageChanged: (index) {
+                          setState(() => currentPage = index);
+                        },
+                        children:
+                            HelpContent.pages.map((page) {
+                              return SingleChildScrollView(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      page['title'],
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...page['content'].map<Widget>((text) {
+                                      final isBold =
+                                          text.endsWith(
+                                            ':',
+                                          ) || // Section headers
+                                          text.endsWith('?') || // Questions
+                                          text.startsWith('•'); // Bullet points
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4,
+                                        ),
+                                        child: Text(
+                                          text,
+                                          style: TextStyle(
+                                            fontWeight:
+                                                isBold
+                                                    ? FontWeight.bold
+                                                    : FontWeight.normal,
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed:
+                            currentPage > 0
+                                ? () => pageController.previousPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                )
+                                : null,
+                        child: const Text('Zurück'),
+                      ),
+                      TextButton(
+                        onPressed:
+                            currentPage < HelpContent.pages.length - 1
+                                ? () => pageController.nextPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                )
+                                : () => Navigator.pop(context),
+                        child: Text(
+                          currentPage < HelpContent.pages.length - 1
+                              ? 'Weiter'
+                              : 'Abschließen',
+                        ),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed:
-                          currentPage > 0
-                              ? () => pageController.previousPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              )
-                              : null,
-                      child: const Text('Zurück'),
-                    ),
-                    TextButton(
-                      onPressed:
-                          currentPage < 2
-                              ? () => pageController.nextPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              )
-                              : () => Navigator.pop(context),
-                      child: Text(currentPage < 2 ? 'Weiter' : 'Abschließen'),
-                    ),
-                  ],
                 ),
           ),
     );

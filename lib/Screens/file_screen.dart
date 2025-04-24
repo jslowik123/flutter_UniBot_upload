@@ -129,10 +129,6 @@ class _FileScreenState extends State<FileScreen> {
     );
   }
 
-  void _changeToChat(BuildContext context) {
-    Navigator.of(context).pushNamed('/LLMChat');
-  }
-
   @override
   Widget build(BuildContext context) {
     final projectName = _projectName ?? "unbekannt";

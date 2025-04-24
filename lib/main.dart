@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'Screens/project_list_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'Support/firebase_options.dart';
-import 'Screens/llm_interface.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,7 +22,6 @@ class MyApp extends StatelessWidget {
       home: ProjectListScreen(),
       routes: {
         '/projectView': (context) => FileScreen(),
-        '/LLMChat': (context) => LLMInterface(),
       },
     );
   }

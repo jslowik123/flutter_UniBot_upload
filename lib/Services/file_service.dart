@@ -3,10 +3,11 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import '../Config/app_config.dart';
 
 class FileService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
-  final String baseUrl = 'http://127.0.0.1:8000/';
 
   Future<List<Map<String, String>>> fetchFiles(String projectName) async {
     final databasePath = 'files/$projectName';
@@ -54,7 +55,7 @@ class FileService {
 
   Future<void> uploadToPinecone(File file, String projectName) async {
     try {
-      final uri = Uri.parse('${baseUrl}upload');
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
 
       if (kIsWeb) {
@@ -81,10 +82,11 @@ class FileService {
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
 
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
         throw Exception(
-          'Upload fehlgeschlagen: ${response.statusCode} - $responseData',
+          'Upload fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
       }
     } catch (e) {
@@ -102,20 +104,62 @@ class FileService {
 
   Future<void> deleteFromPinecone(String fileName, String projectName) async {
     try {
-      final uri = Uri.parse('$baseUrl/delete');
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete');
       final request =
           http.MultipartRequest('POST', uri)
             ..fields['file_name'] = fileName
             ..fields['namespace'] = projectName;
 
       final response = await request.send();
-      if (response.statusCode != 200) {
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
         throw Exception(
-          'Löschen aus Pinecone fehlgeschlagen: ${response.statusCode}',
+          'Löschen fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
       }
     } catch (e) {
       throw Exception('Fehler beim Löschen aus Pinecone: $e');
+    }
+  }
+
+
+  Future<String> sendMessageToBot(String message) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/send_message');
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'user_input': message}),
+      );
+
+      final jsonResponse = json.decode(response.body);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception(
+          'Bot-Antwort fehlgeschlagen: ${jsonResponse['message']}',
+        );
+      }
+
+      return jsonResponse['response'];
+    } catch (e) {
+      throw Exception('Fehler bei der Bot-Kommunikation: $e');
+    }
+  }
+
+  Future<void> startBot() async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/start_bot');
+      final response = await http.post(uri);
+
+      final jsonResponse = json.decode(response.body);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception('Bot-Start fehlgeschlagen: ${jsonResponse['message']}');
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Starten des Bots: $e');
     }
   }
 }
