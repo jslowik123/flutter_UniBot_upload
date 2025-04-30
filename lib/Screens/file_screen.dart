@@ -6,6 +6,7 @@ import '/Widgets/file_tile.dart';
 import '/Widgets/new_file.dart';
 import '/Services/file_service.dart';
 import '/Widgets/help_dialog.dart';
+import '/Services/snackbar_service.dart';
 
 class FileScreen extends StatefulWidget {
   const FileScreen({super.key});
@@ -46,7 +47,7 @@ class _FileScreenState extends State<FileScreen> {
       final files = await _fileService.fetchFiles(_projectName!);
       setState(() => _importedFiles = files);
     } catch (e) {
-      _showErrorSnackBar('Fehler beim Abrufen der Dateien: $e');
+      SnackbarService.showError(context, 'Fehler beim Laden der Dateien: $e');
     }
   }
 
@@ -158,20 +159,21 @@ class _FileScreenState extends State<FileScreen> {
           constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
             children: [
-              _importedFiles.isEmpty
-                  ? const Center(child: Text('Keine Dateien vorhanden.'))
-                  : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 120.0),
-                    itemCount: _importedFiles.length,
-                    itemBuilder: (context, index) {
-                      final file = _importedFiles[index];
-                      return FileTile(
-                        file: file,
-                        deleteFileFunc:
-                            () => _deleteFile(file['path']!, file['name']!),
-                      );
-                    },
-                  ),
+              if (!_isLoading && _importedFiles.isEmpty)
+                const Center(child: Text('Keine Dateien vorhanden.'))
+              else if (!_isLoading && _importedFiles.isNotEmpty)
+                ListView.builder(
+                  padding: const EdgeInsets.only(bottom: 120.0),
+                  itemCount: _importedFiles.length,
+                  itemBuilder: (context, index) {
+                    final file = _importedFiles[index];
+                    return FileTile(
+                      file: file,
+                      deleteFileFunc:
+                          () => _deleteFile(file['path']!, file['name']!),
+                    );
+                  },
+                ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -183,7 +185,26 @@ class _FileScreenState extends State<FileScreen> {
                   filePicked: _filePicked,
                 ),
               ),
-              if (_isLoading) const Center(child: CircularProgressIndicator()),
+              if (_isLoading)
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(
+                        _filePicked
+                            ? 'Datei wird verarbeitet...\nDies kann einen Moment dauern.'
+                            : 'Lade...',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
