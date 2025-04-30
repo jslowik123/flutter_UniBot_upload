@@ -35,10 +35,9 @@ void main() async {
       print('Upload erfolgreich!');
       print('Response: $responseData');
     } else {
-      print('Upload fehlgeschlagen: ${response.statusCode}');
-      print('Response: $responseData');
+  
     }
   } catch (e) {
-    print('Fehler beim Upload: $e');
+
   }
 }

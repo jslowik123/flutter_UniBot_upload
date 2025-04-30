@@ -2,6 +2,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../Config/app_config.dart';
+import 'dart:convert';
 
 class ProjectService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
@@ -30,12 +31,13 @@ class ProjectService {
   Future<void> addProject(String projectName) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/create_namespace'),
-      headers: {'Content-Type': 'application/json'},
-      body: '{"namespace": "$projectName"}',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'namespace': projectName, 'dimension': '1536'},
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to create namespace: ${response.body}');
+      final responseData = json.decode(response.body);
+      throw Exception('Failed to create namespace: ${responseData['message']}');
     }
 
     final newProjectRef = _db.child(projectName);
@@ -45,12 +47,13 @@ class ProjectService {
   Future<void> deleteProject(String projectName) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace'),
-      headers: {'Content-Type': 'application/json'},
-      body: '{"namespace": "$projectName"}',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'namespace': projectName},
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to delete namespace: ${response.body}');
+      final responseData = json.decode(response.body);
+      throw Exception('Failed to delete namespace: ${responseData['message']}');
     }
 
     await _db.child(projectName).remove();

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -53,44 +53,43 @@ class FileService {
     }
   }
 
-  Future<void> uploadToPinecone(File file, String projectName) async {
+  Future<String> uploadToPinecone(
+    String filePath,
+    Uint8List fileBytes,
+    String fileName,
+    String projectName,
+  ) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
-
+      request.fields['namespace'] = projectName;
       if (kIsWeb) {
-        request
-          ..files.add(
-            http.MultipartFile.fromBytes(
-              'file',
-              await file.readAsBytes(),
-              filename: file.path.split('/').last,
-            ),
-          )
-          ..fields['namespace'] = projectName;
+        request.files.add(
+          http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
+        );
       } else {
-        request
-          ..files.add(
-            await http.MultipartFile.fromPath(
-              'file',
-              file.path,
-              filename: file.path.split('/').last,
-            ),
-          )
-          ..fields['namespace'] = projectName;
+        // Handle mobile upload
+        request.files.add(
+          await http.MultipartFile.fromPath(
+            'file',
+            filePath,
+            filename: fileName,
+          ),
+        );
       }
 
       final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonResponse = json.decode(responseData);
+      final responseBody = await http.Response.fromStream(response);
+      final jsonResponse = json.decode(responseBody.body);
 
       if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
         throw Exception(
           'Upload fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
       }
+      return jsonResponse['message'] ?? 'Upload erfolgreich';
     } catch (e) {
-      throw Exception('Fehler beim Pinecone-Upload: $e');
+      throw Exception('Fehler beim Upload: $e');
     }
   }
 
@@ -124,17 +123,57 @@ class FileService {
     }
   }
 
+  Future<void> deleteNamespace(String projectName) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace');
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['namespace'] = projectName;
 
-  Future<String> sendMessageToBot(String message) async {
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception(
+          'Namespace-Löschung fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Löschen des Namespaces: $e');
+    }
+  }
+
+  Future<void> deleteAllVectors(String projectName) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_all');
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['namespace'] = projectName;
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception(
+          'Löschen aller Vektoren fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Löschen aller Vektoren: $e');
+    }
+  }
+
+  Future<String> sendMessageToBot(String message, String projectName) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/send_message');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'user_input': message}),
-      );
+      final request =
+          http.MultipartRequest('POST', uri)
+            ..fields['user_input'] = message
+            ..fields['namespace'] = projectName;
 
-      final jsonResponse = json.decode(response.body);
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
 
       if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
         throw Exception(

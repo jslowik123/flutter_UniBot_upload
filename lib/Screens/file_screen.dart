@@ -1,6 +1,7 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '/Widgets/file_tile.dart';
 import '/Widgets/new_file.dart';
 import '/Services/file_service.dart';
@@ -23,7 +24,7 @@ class _FileScreenState extends State<FileScreen> {
   bool _isInitialized = false;
   bool _isLoading = false;
   Map<String, dynamic>? _routeArgs;
-  late File _file;
+  late Uint8List _fileBytes;
   String? _projectName;
 
   @override
@@ -58,12 +59,17 @@ class _FileScreenState extends State<FileScreen> {
       );
 
       if (result != null) {
-        _file = File(result.files.single.path!);
-        setState(() {
+        _filePath = result.files.single.path;
+        _fileName = result.files.single.name;
+        if (kIsWeb) {
+          final bytes = result.files.single.bytes;
+          if (bytes != null) {
+            _fileBytes = bytes;
+          }
+        } else {
           _filePath = result.files.single.path;
-          _fileName = result.files.single.name;
-          _filePicked = true;
-        });
+        }
+        setState(() => _filePicked = true);
       }
     } catch (e) {
       _showErrorSnackBar('Fehler beim Datei-Import: $e');
@@ -78,24 +84,28 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _fileService.uploadToPinecone(_file, _projectName!);
+      final successMessage = await _fileService.uploadToPinecone(
+        _filePath!,
+        _fileBytes,
+        _fileName!,
+        _projectName!,
+      );
       await _fileService.uploadToFirebase(
         _projectName!,
         _fileName!,
         _filePath!,
       );
-
-      _showSuccessSnackBar('Datei erfolgreich hochgeladen und verarbeitet');
+      print('Success message: $successMessage');
+      _showSuccessSnackBar(successMessage);
       await _fetchFilesFromDatabase();
-
       setState(() {
+        _isLoading = false;
         _filePicked = false;
         _fileName = null;
         _filePath = null;
       });
     } catch (e) {
       _showErrorSnackBar('Fehler beim Upload: $e');
-    } finally {
       setState(() => _isLoading = false);
     }
   }
