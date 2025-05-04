@@ -21,12 +21,13 @@ class _FileScreenState extends State<FileScreen> {
   String? _filePath;
   String? _fileName;
   bool _filePicked = false;
-  List<Map<String, String>> _importedFiles = [];
+  List<Map<String, dynamic>> _importedFiles = [];
   bool _isInitialized = false;
   bool _isLoading = false;
   Map<String, dynamic>? _routeArgs;
   late Uint8List _fileBytes;
   String? _projectName;
+  String? _fileID;
 
   @override
   void didChangeDependencies() {
@@ -69,6 +70,7 @@ class _FileScreenState extends State<FileScreen> {
           }
         } else {
           _filePath = result.files.single.path;
+          _fileBytes = Uint8List(0);
         }
         setState(() => _filePicked = true);
       }
@@ -85,25 +87,42 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      final successMessage = await _fileService.uploadToPinecone(
-        _filePath!,
-        _fileBytes,
-        _fileName!,
-        _projectName!,
-      );
-      await _fileService.uploadToFirebase(
+      _fileID = await _fileService.uploadToFirebase(
         _projectName!,
         _fileName!,
         _filePath!,
       );
-      print('Success message: $successMessage');
-      _showSuccessSnackBar(successMessage);
-      await _fetchFilesFromDatabase();
+      print('File ID: $_fileID');
+
+      try {
+        final successMessage = await _fileService.uploadToPinecone(
+          _filePath!,
+          _fileBytes,
+          _fileName!,
+          _projectName!,
+          _fileID!,
+        );
+
+        print('Success message: $successMessage');
+        await _fetchFilesFromDatabase();
+        _showSuccessSnackBar(successMessage);
+      } catch (pineconeError) {
+        // Bei Pinecone-Fehler: Dokument aus Firebase löschen
+        if (_fileID != null) {
+          await _fileService.deleteFromFirebase(
+            'files/${_projectName!}/$_fileID',
+          );
+          print('Firebase-Eintrag nach Pinecone-Fehler gelöscht: $_fileID');
+        }
+        rethrow; // Fehler weiterwerfen für die catch-Klausel außen
+      }
+
       setState(() {
         _isLoading = false;
         _filePicked = false;
         _fileName = null;
         _filePath = null;
+        _fileID = null;
       });
     } catch (e) {
       _showErrorSnackBar('Fehler beim Upload: $e');

@@ -9,22 +9,30 @@ import '../Config/app_config.dart';
 class FileService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
 
-  Future<List<Map<String, String>>> fetchFiles(String projectName) async {
+  Future<List<Map<String, dynamic>>> fetchFiles(String projectName) async {
     final databasePath = 'files/$projectName';
     try {
       final snapshot = await _db.child(databasePath).get();
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
-        final List<Map<String, String>> loadedFiles = [];
+        final List<Map<String, dynamic>> loadedFiles = [];
         data.forEach((key, value) {
-          if (value is Map &&
-              value.containsKey('name') &&
-              value.containsKey('date')) {
-            loadedFiles.add({
-              'name': value['name'] as String,
+          if (value is Map) {
+            final fileData = <String, dynamic>{
+              'name': value['name'] as String? ?? '',
               'path': '$databasePath/$key',
-              'date': value['date'] as String,
-            });
+              'date': value['date'] as String? ?? '',
+            };
+
+            if (value.containsKey('keywords')) {
+              fileData['keywords'] = value['keywords'];
+            }
+
+            if (value.containsKey('summary')) {
+              fileData['summary'] = value['summary'] as String? ?? '';
+            }
+
+            loadedFiles.add(fileData);
           }
         });
         return loadedFiles;
@@ -35,7 +43,7 @@ class FileService {
     }
   }
 
-  Future<void> uploadToFirebase(
+  Future<String> uploadToFirebase(
     String projectName,
     String fileName,
     String filePath,
@@ -47,7 +55,9 @@ class FileService {
         'path': filePath,
         'date': DateFormat('dd.MM.yyyy').format(DateTime.now()),
       };
-      await _db.child(databasePath).push().set(data);
+      final newRef = _db.child(databasePath).push();
+      await newRef.set(data);
+      return newRef.key ?? '';
     } catch (e) {
       throw Exception('Fehler beim Firebase-Upload: $e');
     }
@@ -58,11 +68,21 @@ class FileService {
     Uint8List fileBytes,
     String fileName,
     String projectName,
+    String fileID,
   ) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
+
+      // Sicherstellen, dass alle erforderlichen Parameter im korrekten Format übergeben werden
       request.fields['namespace'] = projectName;
+      request.fields['fileID'] = fileID;
+
+      // Debug-Info
+      print('Uploading to Pinecone with fileID: $fileID');
+      print('File name: $fileName');
+      print('Namespace: $projectName');
+
       if (kIsWeb) {
         request.files.add(
           http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
@@ -80,6 +100,11 @@ class FileService {
 
       final response = await request.send();
       final responseBody = await http.Response.fromStream(response);
+
+      // Debug-Info für Response
+      print('Response status: ${response.statusCode}');
+      print('Response body: ${responseBody.body}');
+
       final jsonResponse = json.decode(responseBody.body);
 
       if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
@@ -89,6 +114,7 @@ class FileService {
       }
       return jsonResponse['message'] ?? 'Upload erfolgreich';
     } catch (e) {
+      print('Fehler bei uploadToPinecone: $e');
       throw Exception('Fehler beim Upload: $e');
     }
   }
