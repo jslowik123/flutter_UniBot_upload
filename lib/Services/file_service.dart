@@ -119,21 +119,20 @@ class FileService {
     }
   }
 
-  Future<void> deleteFromFirebase(String path) async {
-    try {
-      await _db.child(path).remove();
-    } catch (e) {
-      throw Exception('Fehler beim Löschen aus Firebase: $e');
-    }
-  }
-
-  Future<void> deleteFromPinecone(String fileName, String projectName) async {
+  Future<void> deleteFile(
+    String fileName,
+    String projectName,
+    String fileID,
+    bool justFirebase,
+  ) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete');
       final request =
           http.MultipartRequest('POST', uri)
             ..fields['file_name'] = fileName
-            ..fields['namespace'] = projectName;
+            ..fields['namespace'] = projectName
+            ..fields['fileID'] = fileID
+            ..fields['just_firebase'] = justFirebase.toString();
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
@@ -145,29 +144,10 @@ class FileService {
         );
       }
     } catch (e) {
-      throw Exception('Fehler beim Löschen aus Pinecone: $e');
+      throw Exception('Fehler beim Löschen der Dei: $e');
     }
   }
 
-  Future<void> deleteNamespace(String projectName) async {
-    try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace');
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['namespace'] = projectName;
-
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonResponse = json.decode(responseData);
-
-      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
-        throw Exception(
-          'Namespace-Löschung fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
-        );
-      }
-    } catch (e) {
-      throw Exception('Fehler beim Löschen des Namespaces: $e');
-    }
-  }
 
   Future<void> deleteAllVectors(String projectName) async {
     try {

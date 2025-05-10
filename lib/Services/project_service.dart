@@ -44,19 +44,24 @@ class ProjectService {
     await newProjectRef.set({"date": getFormattedDate()});
   }
 
-  Future<void> deleteProject(String projectName) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'namespace': projectName},
-    );
+ Future<void> deleteProject(String projectName) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace');
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['namespace'] = projectName;
 
-    if (response.statusCode != 200) {
-      final responseData = json.decode(response.body);
-      throw Exception('Failed to delete namespace: ${responseData['message']}');
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception(
+          'Namespace-Löschung fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Löschen des Namespaces: $e');
     }
-
-    await _db.child(projectName).remove();
   }
 
   Future<void> updateProjectName(String oldName, String newName) async {

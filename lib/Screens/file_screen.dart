@@ -109,10 +109,12 @@ class _FileScreenState extends State<FileScreen> {
       } catch (pineconeError) {
         // Bei Pinecone-Fehler: Dokument aus Firebase löschen
         if (_fileID != null) {
-          await _fileService.deleteFromFirebase(
-            'files/${_projectName!}/$_fileID',
+          await _fileService.deleteFile(
+            _fileName!,
+            _projectName!,
+            _fileID!,
+            true,
           );
-          print('Firebase-Eintrag nach Pinecone-Fehler gelöscht: $_fileID');
         }
         rethrow; // Fehler weiterwerfen für die catch-Klausel außen
       }
@@ -135,8 +137,10 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _fileService.deleteFromFirebase(path);
-      await _fileService.deleteFromPinecone(fileName, _projectName!);
+      // Extrahieren der fileID aus dem Pfad
+      final fileID = path.split('/').last;
+
+      await _fileService.deleteFile(fileName, _projectName!, fileID, false);
 
       _showSuccessSnackBar('Datei erfolgreich gelöscht');
       await _fetchFilesFromDatabase();
