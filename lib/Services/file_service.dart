@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import '../Config/app_config.dart';
+import '../models/processing_status.dart';
 
 class FileService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref();
@@ -54,6 +55,7 @@ class FileService {
         'name': fileName,
         'path': filePath,
         'date': DateFormat('dd.MM.yyyy').format(DateTime.now()),
+        'processing': true,
       };
       final newRef = _db.child(databasePath).push();
       await newRef.set(data);
@@ -63,12 +65,13 @@ class FileService {
     }
   }
 
-  Future<String> uploadToPinecone(
+  Future<Map<String, dynamic>> uploadToPinecone(
     String filePath,
     Uint8List fileBytes,
     String fileName,
     String projectName,
     String fileID,
+    List<String> taskIDs,
   ) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
@@ -112,7 +115,7 @@ class FileService {
           'Upload fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
       }
-      return jsonResponse['message'] ?? 'Upload erfolgreich';
+      return jsonResponse;
     } catch (e) {
       print('Fehler bei uploadToPinecone: $e');
       throw Exception('Fehler beim Upload: $e');
@@ -147,7 +150,6 @@ class FileService {
       throw Exception('Fehler beim Löschen der Dei: $e');
     }
   }
-
 
   Future<void> deleteAllVectors(String projectName) async {
     try {
@@ -205,6 +207,101 @@ class FileService {
       }
     } catch (e) {
       throw Exception('Fehler beim Starten des Bots: $e');
+    }
+  }
+
+  Future<ProcessingStatus> checkTaskStatus(
+    String taskId,
+    String fileName,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/task_status/$taskId'),
+      );
+
+      print('Task Status Response: ${response.body}');
+      final result = json.decode(response.body);
+
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Status-Abfrage fehlgeschlagen: ${response.statusCode}',
+        );
+      }
+
+      return ProcessingStatus.fromJson(result, fileName);
+    } catch (e) {
+      print('Fehler bei Status-Abfrage: $e');
+      return ProcessingStatus(
+        taskId: taskId,
+        state: 'ERROR',
+        status: e.toString(),
+        progress: 0,
+        fileName: fileName,
+      );
+    }
+  }
+
+  Future<void> startStatusPolling(
+    String taskId,
+    String fileName,
+    Function(ProcessingStatus) onStatusUpdate,
+  ) async {
+    while (true) {
+      final status = await checkTaskStatus(taskId, fileName);
+      onStatusUpdate(status);
+
+      if (status.isComplete || status.isError) {
+        break;
+      }
+
+      await Future.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  Future<void> updateFileProcessingStatus(
+    String projectName,
+    String fileID,
+    bool isProcessing,
+    String? taskId,
+  ) async {
+    try {
+      final updates = <String, dynamic>{'processing': isProcessing};
+      if (taskId != null) {
+        updates['taskId'] = taskId;
+      }
+      await _db.child('files/$projectName/$fileID').update(updates);
+    } catch (e) {
+      print('Fehler beim Update des Processing-Status: $e');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchProcessingFiles(
+    String projectName,
+  ) async {
+    final databasePath = 'files/$projectName';
+    try {
+      final snapshot = await _db.child(databasePath).get();
+      if (snapshot.exists) {
+        final data = snapshot.value as Map<dynamic, dynamic>;
+        final List<Map<String, dynamic>> processingFiles = [];
+
+        data.forEach((key, value) {
+          if (value is Map &&
+              value['processing'] == true &&
+              value['taskId'] != null) {
+            processingFiles.add({
+              'fileID': key,
+              'fileName': value['name'],
+              'taskId': value['taskId'],
+            });
+          }
+        });
+        return processingFiles;
+      }
+      return [];
+    } catch (e) {
+      print('Fehler beim Abrufen der processing files: $e');
+      return [];
     }
   }
 }

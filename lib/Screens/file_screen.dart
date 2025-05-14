@@ -7,6 +7,8 @@ import '/Widgets/new_file.dart';
 import '/Services/file_service.dart';
 import '/Widgets/help_dialog.dart';
 import '/Services/snackbar_service.dart';
+import '../models/processing_status.dart';
+import '../widgets/processing_status_tile.dart';
 
 class FileScreen extends StatefulWidget {
   const FileScreen({super.key});
@@ -28,6 +30,7 @@ class _FileScreenState extends State<FileScreen> {
   late Uint8List _fileBytes;
   String? _projectName;
   String? _fileID;
+  final Map<String, ProcessingStatus> _processingFiles = {};
 
   @override
   void didChangeDependencies() {
@@ -36,9 +39,16 @@ class _FileScreenState extends State<FileScreen> {
       _routeArgs =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _projectName = _routeArgs?['name'];
-      _fetchFilesFromDatabase();
+      _initializeScreen();
       _isInitialized = true;
     }
+  }
+
+  Future<void> _initializeScreen() async {
+    if (_projectName == null) return;
+
+    await _fetchFilesFromDatabase();
+    await _restoreProcessingFiles();
   }
 
   Future<void> _fetchFilesFromDatabase() async {
@@ -49,6 +59,54 @@ class _FileScreenState extends State<FileScreen> {
       setState(() => _importedFiles = files);
     } catch (e) {
       SnackbarService.showError(context, 'Fehler beim Laden der Dateien: $e');
+    }
+  }
+
+  Future<void> _restoreProcessingFiles() async {
+    if (_projectName == null) return;
+
+    try {
+      final processingFiles = await _fileService.fetchProcessingFiles(
+        _projectName!,
+      );
+      for (final file in processingFiles) {
+        final taskId = file['taskId'];
+        final fileName = file['fileName'];
+        final fileID = file['fileID'];
+
+        setState(() {
+          _processingFiles[taskId] = ProcessingStatus(
+            taskId: taskId,
+            state: 'PROCESSING',
+            status: 'Wird verarbeitet',
+            progress: 0,
+            fileName: fileName,
+          );
+        });
+
+        _fileService.startStatusPolling(taskId, fileName, (status) {
+          if (mounted) {
+            if (status.isComplete || status.isError) {
+              setState(() {
+                _processingFiles.remove(status.taskId);
+              });
+              _fileService.updateFileProcessingStatus(
+                _projectName!,
+                fileID,
+                false,
+                null,
+              );
+              if (status.isComplete) {
+                _fetchFilesFromDatabase();
+              }
+            } else {
+              setState(() => _processingFiles[taskId] = status);
+            }
+          }
+        });
+      }
+    } catch (e) {
+      print('Fehler beim Wiederherstellen der Verarbeitungsstatus: $e');
     }
   }
 
@@ -95,28 +153,75 @@ class _FileScreenState extends State<FileScreen> {
       print('File ID: $_fileID');
 
       try {
-        final successMessage = await _fileService.uploadToPinecone(
+        final response = await _fileService.uploadToPinecone(
           _filePath!,
           _fileBytes,
           _fileName!,
           _projectName!,
           _fileID!,
+          [],
         );
 
-        print('Success message: $successMessage');
-        await _fetchFilesFromDatabase();
-        _showSuccessSnackBar(successMessage);
-      } catch (pineconeError) {
-        // Bei Pinecone-Fehler: Dokument aus Firebase löschen
-        if (_fileID != null) {
-          await _fileService.deleteFile(
-            _fileName!,
+        if (response['status'] == 'success' && response['task_id'] != null) {
+          final taskId = response['task_id'];
+
+          await _fileService.updateFileProcessingStatus(
             _projectName!,
             _fileID!,
             true,
+            taskId,
           );
+
+          setState(() {
+            _processingFiles[taskId] = ProcessingStatus(
+              taskId: taskId,
+              state: 'PENDING',
+              status: 'Warte auf Verarbeitung',
+              progress: 0,
+              fileName: _fileName!,
+            );
+          });
+
+          _fileService.startStatusPolling(taskId, _fileName!, (status) {
+            if (mounted) {
+              if (status.isComplete || status.isError) {
+                setState(() {
+                  _processingFiles.remove(status.taskId);
+                });
+                _fileService.updateFileProcessingStatus(
+                  _projectName!,
+                  _fileID!,
+                  false,
+                  null,
+                );
+                if (status.isComplete) {
+                  _fetchFilesFromDatabase();
+                }
+              } else {
+                setState(() => _processingFiles[taskId] = status);
+              }
+            }
+          });
+
+          _showSuccessSnackBar('Upload gestartet');
+        } else {
+          throw Exception(response['message'] ?? 'Unbekannter Fehler');
         }
-        rethrow; // Fehler weiterwerfen für die catch-Klausel außen
+      } catch (uploadError) {
+        print('Upload Fehler: $uploadError');
+        if (_fileID != null) {
+          try {
+            await _fileService.deleteFile(
+              _fileName!,
+              _projectName!,
+              _fileID!,
+              true,
+            );
+          } catch (deleteError) {
+            print('Fehler beim Löschen: $deleteError');
+          }
+        }
+        rethrow;
       }
 
       setState(() {
@@ -165,11 +270,9 @@ class _FileScreenState extends State<FileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final projectName = _projectName ?? "unbekannt";
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(projectName),
+        title: Text(_projectName ?? "unbekannt"),
         actions: [
           IconButton(
             onPressed: () => _helpDialog.showHelpDialog(context),
@@ -182,21 +285,23 @@ class _FileScreenState extends State<FileScreen> {
           constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
             children: [
-              if (!_isLoading && _importedFiles.isEmpty)
-                const Center(child: Text('Keine Dateien vorhanden.'))
-              else if (!_isLoading && _importedFiles.isNotEmpty)
-                ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 120.0),
-                  itemCount: _importedFiles.length,
-                  itemBuilder: (context, index) {
-                    final file = _importedFiles[index];
-                    return FileTile(
-                      file: file,
-                      deleteFileFunc:
-                          () => _deleteFile(file['path']!, file['name']!),
-                    );
-                  },
-                ),
+              !_isLoading && _importedFiles.isEmpty && _processingFiles.isEmpty
+                  ? const Center(child: Text('Keine Dateien vorhanden.'))
+                  : ListView(
+                    padding: const EdgeInsets.only(bottom: 120.0),
+                    children: [
+                      ..._processingFiles.values.map(
+                        (status) => ProcessingStatusTile(status: status),
+                      ),
+                      ..._importedFiles.map(
+                        (file) => FileTile(
+                          file: file,
+                          deleteFileFunc:
+                              () => _deleteFile(file['path']!, file['name']!),
+                        ),
+                      ),
+                    ],
+                  ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -208,26 +313,7 @@ class _FileScreenState extends State<FileScreen> {
                   filePicked: _filePicked,
                 ),
               ),
-              if (_isLoading)
-                Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(
-                        _filePicked
-                            ? 'Datei wird verarbeitet...\nDies kann einen Moment dauern.'
-                            : 'Lade...',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              if (_isLoading) const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),
