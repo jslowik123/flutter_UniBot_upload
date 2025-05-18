@@ -180,44 +180,6 @@ class FileService {
     }
   }
 
-  Future<String> sendMessageToBot(String message, String projectName) async {
-    try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/send_message');
-      final request =
-          http.MultipartRequest('POST', uri)
-            ..fields['user_input'] = message
-            ..fields['namespace'] = projectName;
-
-      final response = await request.send();
-      final responseData = await response.stream.bytesToString();
-      final jsonResponse = json.decode(responseData);
-
-      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
-        throw Exception(
-          'Bot-Antwort fehlgeschlagen: ${jsonResponse['message']}',
-        );
-      }
-
-      return jsonResponse['response'];
-    } catch (e) {
-      throw Exception('Fehler bei der Bot-Kommunikation: $e');
-    }
-  }
-
-  Future<void> startBot() async {
-    try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/start_bot');
-      final response = await http.post(uri);
-
-      final jsonResponse = json.decode(response.body);
-
-      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
-        throw Exception('Bot-Start fehlgeschlagen: ${jsonResponse['message']}');
-      }
-    } catch (e) {
-      throw Exception('Fehler beim Starten des Bots: $e');
-    }
-  }
 
   Future<void> updateFileProcessingStatus(
     String projectName,
