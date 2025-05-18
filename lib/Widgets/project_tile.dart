@@ -30,7 +30,7 @@ class ProjectTile extends StatelessWidget {
         onTap: () => viewProjectFunc(context, project),
         leading: CircleAvatar(
           backgroundColor: Colors.blue.shade100,
-          child: const Icon(Icons.work, color: Colors.blueAccent),
+          child: const Icon(Icons.my_library_books, color: Colors.blueAccent),
         ),
         title: Text(
           project['name'],

@@ -1,10 +1,42 @@
 import 'package:flutter/material.dart';
 import '../models/processing_status.dart';
+import '../services/file_service.dart';
 
-class ProcessingStatusTile extends StatelessWidget {
+class ProcessingStatusTile extends StatefulWidget {
   final ProcessingStatus status;
+  final Function onStatusUpdate;
+  const ProcessingStatusTile({
+    super.key,
+    required this.status,
+    required this.onStatusUpdate,
+  });
 
-  const ProcessingStatusTile({super.key, required this.status});
+  @override
+  State<ProcessingStatusTile> createState() => _ProcessingStatusTileState();
+}
+
+class _ProcessingStatusTileState extends State<ProcessingStatusTile> {
+  final FileService _fileService = FileService();
+
+  @override
+  void initState() {
+    super.initState();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    if (!mounted) return;
+
+    _fileService.startStatusPolling(
+      widget.status.taskId,
+      widget.status.fileName,
+      (status) {
+        if (mounted) {
+          widget.onStatusUpdate(status);
+        }
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,19 +44,19 @@ class ProcessingStatusTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       child: ListTile(
         leading: _buildLeadingIcon(),
-        title: Text(status.fileName),
+        title: Text(widget.status.fileName),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
             Text(_getStatusMessage()),
-            if (status.isProcessing) ...[
+            if (widget.status.isProcessing) ...[
               const SizedBox(height: 8),
               LinearProgressIndicator(
-                value: status.progress / 100,
+                value: widget.status.progress / 100,
                 backgroundColor: Colors.grey[200],
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  status.isError ? Colors.red : Colors.blue,
+                  widget.status.isError ? Colors.red : Colors.blue,
                 ),
               ),
             ],
@@ -35,9 +67,9 @@ class ProcessingStatusTile extends StatelessWidget {
   }
 
   Widget _buildLeadingIcon() {
-    if (status.isComplete) {
+    if (widget.status.isComplete) {
       return const Icon(Icons.check_circle, color: Colors.green);
-    } else if (status.isError) {
+    } else if (widget.status.isError) {
       return const Icon(Icons.error, color: Colors.red);
     } else {
       return const SizedBox(
@@ -49,12 +81,12 @@ class ProcessingStatusTile extends StatelessWidget {
   }
 
   String _getStatusMessage() {
-    if (status.isComplete) {
+    if (widget.status.isComplete) {
       return 'Verarbeitung abgeschlossen';
-    } else if (status.isError) {
-      return 'Fehler: ${status.error ?? status.status}';
+    } else if (widget.status.isError) {
+      return 'Fehler: ${widget.status.error ?? widget.status.status}';
     } else {
-      return '${status.status} (${status.progress}%)';
+      return '${widget.status.status} (${widget.status.progress}%)';
     }
   }
 }

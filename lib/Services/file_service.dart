@@ -8,20 +8,24 @@ import '../Config/app_config.dart';
 import '../models/processing_status.dart';
 
 class FileService {
-  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+  final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
+    AppConfig.firebaseFilesPath,
+  );
 
-  Future<List<Map<String, dynamic>>> fetchFiles(String projectName) async {
-    final databasePath = 'files/$projectName';
+  Future<List<List<Map<String, dynamic>>>> fetchFiles(
+    String projectName,
+  ) async {
     try {
-      final snapshot = await _db.child(databasePath).get();
+      final snapshot = await _db.child(projectName).get();
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
         final List<Map<String, dynamic>> loadedFiles = [];
+        final List<Map<String, dynamic>> processingFiles = [];
         data.forEach((key, value) {
           if (value is Map) {
             final fileData = <String, dynamic>{
               'name': value['name'] as String? ?? '',
-              'path': '$databasePath/$key',
+              'path': '$projectName/$key',
               'date': value['date'] as String? ?? '',
             };
 
@@ -32,11 +36,17 @@ class FileService {
             if (value.containsKey('summary')) {
               fileData['summary'] = value['summary'] as String? ?? '';
             }
-
-            loadedFiles.add(fileData);
+            if (value['processing'] == true) {
+              fileData['processing'] = value['processing'];
+              fileData['taskId'] = value['taskId'];
+              processingFiles.add(fileData);
+            } else {
+              fileData['processing'] = false;
+              loadedFiles.add(fileData);
+            }
           }
         });
-        return loadedFiles;
+        return [loadedFiles, processingFiles];
       }
       return [];
     } catch (e) {
@@ -49,7 +59,6 @@ class FileService {
     String fileName,
     String filePath,
   ) async {
-    final databasePath = 'files/$projectName';
     try {
       Map<String, dynamic> data = {
         'name': fileName,
@@ -57,7 +66,7 @@ class FileService {
         'date': DateFormat('dd.MM.yyyy').format(DateTime.now()),
         'processing': true,
       };
-      final newRef = _db.child(databasePath).push();
+      final newRef = _db.child(projectName).push();
       await newRef.set(data);
       return newRef.key ?? '';
     } catch (e) {
@@ -65,7 +74,7 @@ class FileService {
     }
   }
 
-  Future<Map<String, dynamic>> uploadToPinecone(
+  Future<Map<String, dynamic>> startTask(
     String filePath,
     Uint8List fileBytes,
     String fileName,
@@ -213,6 +222,7 @@ class FileService {
   Future<ProcessingStatus> checkTaskStatus(
     String taskId,
     String fileName,
+    String fileID,
   ) async {
     try {
       final response = await http.get(
@@ -228,7 +238,7 @@ class FileService {
         );
       }
 
-      return ProcessingStatus.fromJson(result, fileName);
+      return ProcessingStatus.fromJson(result, fileName, fileID: fileID);
     } catch (e) {
       print('Fehler bei Status-Abfrage: $e');
       return ProcessingStatus(
@@ -237,6 +247,7 @@ class FileService {
         status: e.toString(),
         progress: 0,
         fileName: fileName,
+        fileID: fileID,
       );
     }
   }
@@ -247,7 +258,9 @@ class FileService {
     Function(ProcessingStatus) onStatusUpdate,
   ) async {
     while (true) {
-      final status = await checkTaskStatus(taskId, fileName);
+      if (taskId.isEmpty) break;
+
+      final status = await checkTaskStatus(taskId, fileName, '');
       onStatusUpdate(status);
 
       if (status.isComplete || status.isError) {
@@ -269,39 +282,9 @@ class FileService {
       if (taskId != null) {
         updates['taskId'] = taskId;
       }
-      await _db.child('files/$projectName/$fileID').update(updates);
+      await _db.child('$projectName/$fileID').update(updates);
     } catch (e) {
       print('Fehler beim Update des Processing-Status: $e');
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> fetchProcessingFiles(
-    String projectName,
-  ) async {
-    final databasePath = 'files/$projectName';
-    try {
-      final snapshot = await _db.child(databasePath).get();
-      if (snapshot.exists) {
-        final data = snapshot.value as Map<dynamic, dynamic>;
-        final List<Map<String, dynamic>> processingFiles = [];
-
-        data.forEach((key, value) {
-          if (value is Map &&
-              value['processing'] == true &&
-              value['taskId'] != null) {
-            processingFiles.add({
-              'fileID': key,
-              'fileName': value['name'],
-              'taskId': value['taskId'],
-            });
-          }
-        });
-        return processingFiles;
-      }
-      return [];
-    } catch (e) {
-      print('Fehler beim Abrufen der processing files: $e');
-      return [];
     }
   }
 }

@@ -23,6 +23,7 @@ class _FileScreenState extends State<FileScreen> {
   String? _filePath;
   String? _fileName;
   bool _filePicked = false;
+  List<ProcessingStatus> _processingFiles = [];
   List<Map<String, dynamic>> _importedFiles = [];
   bool _isInitialized = false;
   bool _isLoading = false;
@@ -30,7 +31,6 @@ class _FileScreenState extends State<FileScreen> {
   late Uint8List _fileBytes;
   String? _projectName;
   String? _fileID;
-  final Map<String, ProcessingStatus> _processingFiles = {};
 
   @override
   void didChangeDependencies() {
@@ -48,65 +48,31 @@ class _FileScreenState extends State<FileScreen> {
     if (_projectName == null) return;
 
     await _fetchFilesFromDatabase();
-    await _restoreProcessingFiles();
   }
 
   Future<void> _fetchFilesFromDatabase() async {
     if (_projectName == null) return;
 
     try {
-      final files = await _fileService.fetchFiles(_projectName!);
-      setState(() => _importedFiles = files);
+      List files = await _fileService.fetchFiles(_projectName!);
+      setState(() => _importedFiles = files[0]);
+      setState(() {
+        _processingFiles =
+            (files[1] as List<dynamic>)
+                .map<ProcessingStatus>(
+                  (file) => ProcessingStatus(
+                    taskId: file['taskId'] ?? '',
+                    state: 'PENDING',
+                    status: 'Waiting',
+                    progress: 0,
+                    fileName: file['name'] ?? '',
+                    fileID: file['path'] ?? '',
+                  ),
+                )
+                .toList();
+      });
     } catch (e) {
       SnackbarService.showError(context, 'Fehler beim Laden der Dateien: $e');
-    }
-  }
-
-  Future<void> _restoreProcessingFiles() async {
-    if (_projectName == null) return;
-
-    try {
-      final processingFiles = await _fileService.fetchProcessingFiles(
-        _projectName!,
-      );
-      for (final file in processingFiles) {
-        final taskId = file['taskId'];
-        final fileName = file['fileName'];
-        final fileID = file['fileID'];
-
-        setState(() {
-          _processingFiles[taskId] = ProcessingStatus(
-            taskId: taskId,
-            state: 'PROCESSING',
-            status: 'Wird verarbeitet',
-            progress: 0,
-            fileName: fileName,
-          );
-        });
-
-        _fileService.startStatusPolling(taskId, fileName, (status) {
-          if (mounted) {
-            if (status.isComplete || status.isError) {
-              setState(() {
-                _processingFiles.remove(status.taskId);
-              });
-              _fileService.updateFileProcessingStatus(
-                _projectName!,
-                fileID,
-                false,
-                null,
-              );
-              if (status.isComplete) {
-                _fetchFilesFromDatabase();
-              }
-            } else {
-              setState(() => _processingFiles[taskId] = status);
-            }
-          }
-        });
-      }
-    } catch (e) {
-      print('Fehler beim Wiederherstellen der Verarbeitungsstatus: $e');
     }
   }
 
@@ -145,85 +111,54 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
+      // 1. Upload to Firebase
       _fileID = await _fileService.uploadToFirebase(
         _projectName!,
         _fileName!,
         _filePath!,
       );
-      print('File ID: $_fileID');
 
-      try {
-        final response = await _fileService.uploadToPinecone(
-          _filePath!,
-          _fileBytes,
-          _fileName!,
+      // 2. Start processing task
+      final response = await _fileService.startTask(
+        _filePath!,
+        _fileBytes,
+        _fileName!,
+        _projectName!,
+        _fileID!,
+        [],
+      );
+
+      if (response['status'] == 'success' && response['task_id'] != null) {
+        final taskId = response['task_id'];
+
+        // 3. Update processing status in Firebase
+        await _fileService.updateFileProcessingStatus(
           _projectName!,
           _fileID!,
-          [],
+          true,
+          taskId,
         );
 
-        if (response['status'] == 'success' && response['task_id'] != null) {
-          final taskId = response['task_id'];
-
-          await _fileService.updateFileProcessingStatus(
-            _projectName!,
-            _fileID!,
-            true,
-            taskId,
-          );
-
-          setState(() {
-            _processingFiles[taskId] = ProcessingStatus(
+        // 4. Add to processing files list
+        setState(() {
+          _processingFiles.add(
+            ProcessingStatus(
               taskId: taskId,
               state: 'PENDING',
               status: 'Warte auf Verarbeitung',
               progress: 0,
               fileName: _fileName!,
-            );
-          });
+              fileID: _fileID!,
+            ),
+          );
+        });
 
-          _fileService.startStatusPolling(taskId, _fileName!, (status) {
-            if (mounted) {
-              if (status.isComplete || status.isError) {
-                setState(() {
-                  _processingFiles.remove(status.taskId);
-                });
-                _fileService.updateFileProcessingStatus(
-                  _projectName!,
-                  _fileID!,
-                  false,
-                  null,
-                );
-                if (status.isComplete) {
-                  _fetchFilesFromDatabase();
-                }
-              } else {
-                setState(() => _processingFiles[taskId] = status);
-              }
-            }
-          });
-
-          _showSuccessSnackBar('Upload gestartet');
-        } else {
-          throw Exception(response['message'] ?? 'Unbekannter Fehler');
-        }
-      } catch (uploadError) {
-        print('Upload Fehler: $uploadError');
-        if (_fileID != null) {
-          try {
-            await _fileService.deleteFile(
-              _fileName!,
-              _projectName!,
-              _fileID!,
-              true,
-            );
-          } catch (deleteError) {
-            print('Fehler beim Löschen: $deleteError');
-          }
-        }
-        rethrow;
+        _showSuccessSnackBar('Upload gestartet');
+      } else {
+        throw Exception(response['message'] ?? 'Unbekannter Fehler');
       }
 
+      // 5. Reset state
       setState(() {
         _isLoading = false;
         _filePicked = false;
@@ -232,6 +167,20 @@ class _FileScreenState extends State<FileScreen> {
         _fileID = null;
       });
     } catch (e) {
+      print('Upload Fehler: $e');
+      // Cleanup if Firebase upload was successful but processing failed
+      if (_fileID != null) {
+        try {
+          await _fileService.deleteFile(
+            _fileName!,
+            _projectName!,
+            _fileID!,
+            true,
+          );
+        } catch (deleteError) {
+          print('Fehler beim Löschen: $deleteError');
+        }
+      }
       _showErrorSnackBar('Fehler beim Upload: $e');
       setState(() => _isLoading = false);
     }
@@ -268,6 +217,45 @@ class _FileScreenState extends State<FileScreen> {
     );
   }
 
+  void _handleStatusUpdate(ProcessingStatus file, ProcessingStatus status) {
+    if (status.isComplete || status.isError) {
+      // Extract only the fileID from the path
+      final fileID = file.fileID.split('/').last;
+      _fileService
+          .updateFileProcessingStatus(_projectName!, fileID, false, null)
+          .then((_) {
+            if (mounted) {
+              setState(() {
+                _processingFiles.removeWhere((f) => f.taskId == file.taskId);
+              });
+              if (status.isComplete) {
+                _fetchFilesFromDatabase();
+              }
+            }
+          });
+    } else {
+      setState(() {
+        final index = _processingFiles.indexWhere(
+          (f) => f.taskId == file.taskId,
+        );
+        if (index != -1) {
+          _processingFiles[index] =
+              status.fileID.isEmpty
+                  ? ProcessingStatus(
+                    taskId: status.taskId,
+                    state: status.state,
+                    status: status.status,
+                    progress: status.progress,
+                    error: status.error,
+                    fileName: status.fileName,
+                    fileID: file.fileID,
+                  )
+                  : status;
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -290,8 +278,12 @@ class _FileScreenState extends State<FileScreen> {
                   : ListView(
                     padding: const EdgeInsets.only(bottom: 120.0),
                     children: [
-                      ..._processingFiles.values.map(
-                        (status) => ProcessingStatusTile(status: status),
+                      ..._processingFiles.map(
+                        (file) => ProcessingStatusTile(
+                          status: file,
+                          onStatusUpdate:
+                              (status) => _handleStatusUpdate(file, status),
+                        ),
                       ),
                       ..._importedFiles.map(
                         (file) => FileTile(

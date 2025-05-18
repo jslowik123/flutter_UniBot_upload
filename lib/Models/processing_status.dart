@@ -5,6 +5,7 @@ class ProcessingStatus {
   final int progress;
   final String? error;
   final String fileName;
+  final String fileID;
 
   ProcessingStatus({
     required this.taskId,
@@ -13,12 +14,14 @@ class ProcessingStatus {
     required this.progress,
     this.error,
     required this.fileName,
+    this.fileID = '',
   });
 
   factory ProcessingStatus.fromJson(
     Map<String, dynamic> json,
-    String fileName,
-  ) {
+    String fileName, {
+    String fileID = '',
+  }) {
     return ProcessingStatus(
       taskId: json['task_id'] ?? '',
       state: json['state'] ?? 'UNKNOWN',
@@ -26,6 +29,7 @@ class ProcessingStatus {
       progress: json['progress'] ?? 0,
       error: json['error'],
       fileName: fileName,
+      fileID: fileID,
     );
   }
 

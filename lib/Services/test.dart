@@ -132,7 +132,7 @@ class DocumentUploadScreenState extends State<DocumentUploadScreen> {
       print('File ID: $_fileID');
 
       try {
-        final response = await _fileService.uploadToPinecone(
+        final response = await _fileService.startTask(
           _filePath!,
           _fileBytes,
           _fileName!,
