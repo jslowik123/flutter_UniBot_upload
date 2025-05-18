@@ -1,39 +1,36 @@
 class ProcessingStatus {
-  final String taskId;
-  final String state;
   final String status;
   final int progress;
   final String? error;
   final String fileName;
   final String fileID;
+  final bool processing;
 
   ProcessingStatus({
-    required this.taskId,
-    required this.state,
     required this.status,
     required this.progress,
     this.error,
     required this.fileName,
-    this.fileID = '',
+    required this.fileID,
+    required this.processing,
   });
 
-  factory ProcessingStatus.fromJson(
-    Map<String, dynamic> json,
-    String fileName, {
-    String fileID = '',
-  }) {
+  factory ProcessingStatus.fromFirebase(
+    Map<dynamic, dynamic> data,
+    String fileName,
+    String fileID,
+  ) {
     return ProcessingStatus(
-      taskId: json['task_id'] ?? '',
-      state: json['state'] ?? 'UNKNOWN',
-      status: json['status'] ?? '',
-      progress: json['progress'] ?? 0,
-      error: json['error'],
+      status: data['status'] ?? 'Unbekannt',
+      progress: data['progress'] ?? 0,
+      error: data['error'],
       fileName: fileName,
       fileID: fileID,
+      processing: data['processing'] ?? false,
     );
   }
 
-  bool get isComplete => state == 'SUCCESS';
-  bool get isError => state == 'ERROR' || state == 'FAILURE';
-  bool get isProcessing => state == 'PROCESSING' || state == 'PENDING';
+  bool get isComplete => !processing && progress >= 100;
+  bool get isError => error != null;
+  bool get isProcessing => processing;
 }

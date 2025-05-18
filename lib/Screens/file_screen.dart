@@ -46,7 +46,6 @@ class _FileScreenState extends State<FileScreen> {
 
   Future<void> _initializeScreen() async {
     if (_projectName == null) return;
-
     await _fetchFilesFromDatabase();
   }
 
@@ -61,12 +60,11 @@ class _FileScreenState extends State<FileScreen> {
             (files[1] as List<dynamic>)
                 .map<ProcessingStatus>(
                   (file) => ProcessingStatus(
-                    taskId: file['taskId'] ?? '',
-                    state: 'PENDING',
-                    status: 'Waiting',
-                    progress: 0,
+                    status: file['status'] ?? 'Warte auf Verarbeitung',
+                    progress: file['progress'] ?? 0,
                     fileName: file['name'] ?? '',
                     fileID: file['path'] ?? '',
+                    processing: true,
                   ),
                 )
                 .toList();
@@ -111,14 +109,12 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // 1. Upload to Firebase
       _fileID = await _fileService.uploadToFirebase(
         _projectName!,
         _fileName!,
         _filePath!,
       );
 
-      // 2. Start processing task
       final response = await _fileService.startTask(
         _filePath!,
         _fileBytes,
@@ -128,27 +124,15 @@ class _FileScreenState extends State<FileScreen> {
         [],
       );
 
-      if (response['status'] == 'success' && response['task_id'] != null) {
-        final taskId = response['task_id'];
-
-        // 3. Update processing status in Firebase
-        await _fileService.updateFileProcessingStatus(
-          _projectName!,
-          _fileID!,
-          true,
-          taskId,
-        );
-
-        // 4. Add to processing files list
+      if (response['status'] == 'success') {
         setState(() {
           _processingFiles.add(
             ProcessingStatus(
-              taskId: taskId,
-              state: 'PENDING',
-              status: 'Warte auf Verarbeitung',
+              status: 'Verarbeitung gestartet',
               progress: 0,
               fileName: _fileName!,
-              fileID: _fileID!,
+              fileID: '$_projectName/$_fileID',
+              processing: true,
             ),
           );
         });
@@ -158,7 +142,6 @@ class _FileScreenState extends State<FileScreen> {
         throw Exception(response['message'] ?? 'Unbekannter Fehler');
       }
 
-      // 5. Reset state
       setState(() {
         _isLoading = false;
         _filePicked = false;
@@ -168,7 +151,6 @@ class _FileScreenState extends State<FileScreen> {
       });
     } catch (e) {
       print('Upload Fehler: $e');
-      // Cleanup if Firebase upload was successful but processing failed
       if (_fileID != null) {
         try {
           await _fileService.deleteFile(
@@ -191,11 +173,8 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      // Extrahieren der fileID aus dem Pfad
       final fileID = path.split('/').last;
-
       await _fileService.deleteFile(fileName, _projectName!, fileID, false);
-
       _showSuccessSnackBar('Datei erfolgreich gelöscht');
       await _fetchFilesFromDatabase();
     } catch (e) {
@@ -219,40 +198,21 @@ class _FileScreenState extends State<FileScreen> {
 
   void _handleStatusUpdate(ProcessingStatus file, ProcessingStatus status) {
     if (status.isComplete || status.isError) {
-      // Extract only the fileID from the path
-      final fileID = file.fileID.split('/').last;
-      _fileService
-          .updateFileProcessingStatus(_projectName!, fileID, false, null)
-          .then((_) {
-            if (mounted) {
-              setState(() {
-                _processingFiles.removeWhere((f) => f.taskId == file.taskId);
-              });
-              if (status.isComplete) {
-                _fetchFilesFromDatabase();
-              }
-            }
-          });
-    } else {
       setState(() {
-        final index = _processingFiles.indexWhere(
-          (f) => f.taskId == file.taskId,
-        );
-        if (index != -1) {
-          _processingFiles[index] =
-              status.fileID.isEmpty
-                  ? ProcessingStatus(
-                    taskId: status.taskId,
-                    state: status.state,
-                    status: status.status,
-                    progress: status.progress,
-                    error: status.error,
-                    fileName: status.fileName,
-                    fileID: file.fileID,
-                  )
-                  : status;
-        }
+        _processingFiles.removeWhere((f) => f.fileID == file.fileID);
       });
+      _fetchFilesFromDatabase();
+    } else {
+      if (mounted) {
+        setState(() {
+          final index = _processingFiles.indexWhere(
+            (f) => f.fileID == file.fileID,
+          );
+          if (index != -1) {
+            _processingFiles[index] = status;
+          }
+        });
+      }
     }
   }
 
@@ -283,6 +243,7 @@ class _FileScreenState extends State<FileScreen> {
                           status: file,
                           onStatusUpdate:
                               (status) => _handleStatusUpdate(file, status),
+                          projectName: _projectName!,
                         ),
                       ),
                       ..._importedFiles.map(

@@ -38,7 +38,8 @@ class FileService {
             }
             if (value['processing'] == true) {
               fileData['processing'] = value['processing'];
-              fileData['taskId'] = value['taskId'];
+              fileData['progress'] = value['progress'] ?? 0;
+              fileData['status'] = value['status'] ?? 'Warte auf Verarbeitung';
               processingFiles.add(fileData);
             } else {
               fileData['processing'] = false;
@@ -65,6 +66,8 @@ class FileService {
         'path': filePath,
         'date': DateFormat('dd.MM.yyyy').format(DateTime.now()),
         'processing': true,
+        'progress': 0,
+        'status': 'Warte auf Verarbeitung',
       };
       final newRef = _db.child(projectName).push();
       await newRef.set(data);
@@ -86,21 +89,14 @@ class FileService {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
 
-      // Sicherstellen, dass alle erforderlichen Parameter im korrekten Format übergeben werden
       request.fields['namespace'] = projectName;
       request.fields['fileID'] = fileID;
-
-      // Debug-Info
-      print('Uploading to Pinecone with fileID: $fileID');
-      print('File name: $fileName');
-      print('Namespace: $projectName');
 
       if (kIsWeb) {
         request.files.add(
           http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
         );
       } else {
-        // Handle mobile upload
         request.files.add(
           await http.MultipartFile.fromPath(
             'file',
@@ -112,11 +108,6 @@ class FileService {
 
       final response = await request.send();
       final responseBody = await http.Response.fromStream(response);
-
-      // Debug-Info für Response
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${responseBody.body}');
-
       final jsonResponse = json.decode(responseBody.body);
 
       if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
@@ -124,6 +115,15 @@ class FileService {
           'Upload fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
       }
+
+      await updateFileProcessingStatus(
+        projectName,
+        fileID,
+        true,
+        'Verarbeitung gestartet',
+        0,
+      );
+
       return jsonResponse;
     } catch (e) {
       print('Fehler bei uploadToPinecone: $e');
@@ -219,69 +219,19 @@ class FileService {
     }
   }
 
-  Future<ProcessingStatus> checkTaskStatus(
-    String taskId,
-    String fileName,
-    String fileID,
-  ) async {
-    try {
-      final response = await http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/task_status/$taskId'),
-      );
-
-      print('Task Status Response: ${response.body}');
-      final result = json.decode(response.body);
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'Status-Abfrage fehlgeschlagen: ${response.statusCode}',
-        );
-      }
-
-      return ProcessingStatus.fromJson(result, fileName, fileID: fileID);
-    } catch (e) {
-      print('Fehler bei Status-Abfrage: $e');
-      return ProcessingStatus(
-        taskId: taskId,
-        state: 'ERROR',
-        status: e.toString(),
-        progress: 0,
-        fileName: fileName,
-        fileID: fileID,
-      );
-    }
-  }
-
-  Future<void> startStatusPolling(
-    String taskId,
-    String fileName,
-    Function(ProcessingStatus) onStatusUpdate,
-  ) async {
-    while (true) {
-      if (taskId.isEmpty) break;
-
-      final status = await checkTaskStatus(taskId, fileName, '');
-      onStatusUpdate(status);
-
-      if (status.isComplete || status.isError) {
-        break;
-      }
-
-      await Future.delayed(const Duration(seconds: 2));
-    }
-  }
-
   Future<void> updateFileProcessingStatus(
     String projectName,
     String fileID,
     bool isProcessing,
-    String? taskId,
+    String status,
+    int progress,
   ) async {
     try {
-      final updates = <String, dynamic>{'processing': isProcessing};
-      if (taskId != null) {
-        updates['taskId'] = taskId;
-      }
+      final updates = <String, dynamic>{
+        'processing': isProcessing,
+        'progress': progress,
+        'status': status,
+      };
       await _db.child('$projectName/$fileID').update(updates);
     } catch (e) {
       print('Fehler beim Update des Processing-Status: $e');
