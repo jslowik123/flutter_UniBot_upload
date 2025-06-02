@@ -28,11 +28,23 @@ class ProjectService {
     return projects;
   }
 
+  String _replaceUmlauts(String text) {
+    return text
+        .replaceAll('Ä', 'Ae')
+        .replaceAll('Ö', 'Oe')
+        .replaceAll('Ü', 'Ue')
+        .replaceAll('ä', 'ae')
+        .replaceAll('ö', 'oe')
+        .replaceAll('ü', 'ue')
+        .replaceAll('ß', 'ss');
+  }
+
   Future<void> addProject(String projectName) async {
+    final sanitizedProjectName = _replaceUmlauts(projectName);
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/create_namespace'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'namespace': projectName, 'dimension': '1536'},
+      body: {'namespace': sanitizedProjectName, 'dimension': '1536'},
     );
 
     if (response.statusCode != 200) {
@@ -40,11 +52,11 @@ class ProjectService {
       throw Exception('Failed to create namespace: ${responseData['message']}');
     }
 
-    final newProjectRef = _db.child(projectName);
+    final newProjectRef = _db.child(sanitizedProjectName);
     await newProjectRef.set({"date": getFormattedDate()});
   }
 
- Future<void> deleteProject(String projectName) async {
+  Future<void> deleteProject(String projectName) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_namespace');
       final request = http.MultipartRequest('POST', uri)
@@ -65,8 +77,11 @@ class ProjectService {
   }
 
   Future<void> updateProjectName(String oldName, String newName) async {
-    final oldProjectRef = _db.child(oldName);
-    final newProjectRef = _db.child(newName);
+    final sanitizedOldName = _replaceUmlauts(oldName);
+    final sanitizedNewName = _replaceUmlauts(newName);
+
+    final oldProjectRef = _db.child(sanitizedOldName);
+    final newProjectRef = _db.child(sanitizedNewName);
 
     final snapshot = await oldProjectRef.once();
     final data = snapshot.snapshot.value as Map<dynamic, dynamic>;

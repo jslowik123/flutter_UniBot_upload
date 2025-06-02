@@ -22,6 +22,11 @@ class FileService {
         final List<Map<String, dynamic>> loadedFiles = [];
         final List<Map<String, dynamic>> processingFiles = [];
         data.forEach((key, value) {
+          // Skip project-level metadata keys like 'date' and 'summary'
+          if (key == 'date' || key == 'summary') {
+            return; // Skip this entry
+          }
+
           if (value is Map) {
             final fileData = <String, dynamic>{
               'name': value['name'] as String? ?? '',
@@ -34,7 +39,23 @@ class FileService {
             }
 
             if (value.containsKey('summary')) {
-              fileData['summary'] = value['summary'] as String? ?? '';
+              final summaryData = value['summary'];
+              if (summaryData is Map) {
+                // If summary is a Map, extract its string values
+                fileData['summary'] =
+                    summaryData.values.whereType<String>().toList();
+              } else if (summaryData is String) {
+                // If summary is a String, treat it as a single bullet point
+                fileData['summary'] = [summaryData];
+              } else if (summaryData is List) {
+                // If summary is already a List, ensure it contains only strings
+                fileData['summary'] = summaryData.whereType<String>().toList();
+              } else {
+                // Otherwise, or if null, initialize as an empty list
+                fileData['summary'] = <String>[];
+              }
+            } else {
+              fileData['summary'] = <String>[];
             }
             if (value['processing'] == true) {
               fileData['processing'] = value['processing'];
@@ -179,7 +200,6 @@ class FileService {
       throw Exception('Fehler beim Löschen aller Vektoren: $e');
     }
   }
-
 
   Future<void> updateFileProcessingStatus(
     String projectName,

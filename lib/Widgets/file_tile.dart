@@ -13,7 +13,15 @@ class FileTile extends StatelessWidget {
             ?.map((e) => e.toString())
             .toList() ??
         [];
-    final String summary = file['summary'] ?? 'Keine Zusammenfassung verfügbar';
+    final List<String> summaryPoints =
+        (file['summary'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        [];
+    final String summaryDisplay =
+        summaryPoints.isNotEmpty
+            ? summaryPoints.join('\n')
+            : 'Keine Zusammenfassung verfügbar';
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -57,7 +65,7 @@ class FileTile extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Text(summary),
+                Text(summaryDisplay),
               ],
             ),
           ),
