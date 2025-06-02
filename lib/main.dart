@@ -1,4 +1,3 @@
-import 'package:flutter_uni_bot/Services/test.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'Support/firebase_options.dart';

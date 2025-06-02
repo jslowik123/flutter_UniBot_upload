@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/processing_status.dart';
-import '../services/file_service.dart';
+//import '../services/file_service.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../config/app_config.dart';
 import 'dart:async';
@@ -21,7 +21,6 @@ class ProcessingStatusTile extends StatefulWidget {
 }
 
 class _ProcessingStatusTileState extends State<ProcessingStatusTile> {
-  final FileService _fileService = FileService();
   late DatabaseReference _statusRef;
   StreamSubscription<DatabaseEvent>? _statusSubscription;
 
@@ -71,7 +70,7 @@ class _ProcessingStatusTileState extends State<ProcessingStatusTile> {
         }
       },
       onError: (error) {
-        print('Firebase listener error: $error');
+        debugPrint('Firebase listener error: $error');
         if (mounted) {
           widget.onStatusUpdate(
             ProcessingStatus(

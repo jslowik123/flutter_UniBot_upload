@@ -42,23 +42,10 @@ class ProjectTile extends StatelessWidget {
               'Kein Datum verfügbar', // Falls kein Datum vorhanden ist, wird dieser Text angezeigt
           style: TextStyle(color: Colors.grey),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () {
-                editProjectFunc(project['name']); // Projekt umbenennen
-              },
-              tooltip: 'Projekt bearbeiten',
-            ),
-
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.redAccent),
-              onPressed: () => deleteProjectFunc(project["name"]),
-              tooltip: 'Projekt löschen',
-            ),
-          ],
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.redAccent),
+          onPressed: () => deleteProjectFunc(project["name"]),
+          tooltip: 'Projekt löschen',
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16.0,

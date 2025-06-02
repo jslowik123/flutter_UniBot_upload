@@ -1,11 +1,10 @@
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:intl/intl.dart';
 import 'dart:convert';
-import '../Config/app_config.dart';
-import '../models/processing_status.dart';
+import '../config/app_config.dart';
 
 class FileService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
@@ -147,7 +146,7 @@ class FileService {
 
       return jsonResponse;
     } catch (e) {
-      print('Fehler bei uploadToPinecone: $e');
+      debugPrint('Fehler bei uploadToPinecone: $e');
       throw Exception('Fehler beim Upload: $e');
     }
   }
@@ -216,7 +215,7 @@ class FileService {
       };
       await _db.child('$projectName/$fileID').update(updates);
     } catch (e) {
-      print('Fehler beim Update des Processing-Status: $e');
+      debugPrint('Fehler beim Update des Processing-Status: $e');
     }
   }
 }

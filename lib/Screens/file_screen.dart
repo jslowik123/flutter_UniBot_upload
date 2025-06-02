@@ -19,7 +19,6 @@ class FileScreen extends StatefulWidget {
 
 class _FileScreenState extends State<FileScreen> {
   final FileService _fileService = FileService();
-  final _helpDialog = HelpDialog();
   String? _filePath;
   String? _fileName;
   bool _filePicked = false;
@@ -150,7 +149,7 @@ class _FileScreenState extends State<FileScreen> {
         _fileID = null;
       });
     } catch (e) {
-      print('Upload Fehler: $e');
+      debugPrint('Upload Fehler: $e');
       if (_fileID != null) {
         try {
           await _fileService.deleteFile(
@@ -160,7 +159,7 @@ class _FileScreenState extends State<FileScreen> {
             true,
           );
         } catch (deleteError) {
-          print('Fehler beim Löschen: $deleteError');
+          debugPrint('Fehler beim Löschen: $deleteError');
         }
       }
       _showErrorSnackBar('Fehler beim Upload: $e');
@@ -223,7 +222,7 @@ class _FileScreenState extends State<FileScreen> {
         title: Text(_projectName ?? "unbekannt"),
         actions: [
           IconButton(
-            onPressed: () => _helpDialog.showHelpDialog(context),
+            onPressed: () => HelpDialog.show(context),
             icon: const Icon(Icons.help_outline),
           ),
         ],
