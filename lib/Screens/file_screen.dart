@@ -233,7 +233,7 @@ class _FileScreenState extends State<FileScreen> {
           child: Stack(
             children: [
               !_isLoading && _importedFiles.isEmpty && _processingFiles.isEmpty
-                  ? const Center(child: Text('Keine Dateien vorhanden.'))
+                  ? const Center(child: Text('Keine Dateien vorhanden'))
                   : ListView(
                     padding: const EdgeInsets.only(bottom: 120.0),
                     children: [
