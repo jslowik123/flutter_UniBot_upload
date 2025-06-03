@@ -33,7 +33,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       setState(() {
         _isLoading = false;
       });
-      SnackbarService.showError(context, 'Fehler beim Laden der Projekte: $e');
+      SnackbarService.showError(context, 'Fehler beim Laden der Chatbots: $e');
     }
   }
 
@@ -41,11 +41,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     try {
       await _projectService.addProject(projectName);
       await _fetchProjects();
-      SnackbarService.showSuccess(context, 'Projekt "$projectName" erstellt');
+      SnackbarService.showSuccess(context, 'Chatbot "$projectName" erstellt');
     } catch (e) {
       SnackbarService.showError(
         context,
-        'Fehler beim Erstellen des Projekts: $e',
+        'Fehler beim Erstellen des Chatbots: $e',
       );
     }
   }
@@ -54,11 +54,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     try {
       await _projectService.deleteProject(projectName);
       await _fetchProjects();
-      SnackbarService.showSuccess(context, 'Projekt gelöscht');
+      SnackbarService.showSuccess(context, 'Chatbot gelöscht');
     } catch (e) {
       SnackbarService.showError(
         context,
-        'Fehler beim Löschen des Projekts: $e',
+        'Fehler beim Löschen des Chatbots: $e',
       );
     }
   }
@@ -68,9 +68,9 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Projekt löschen'),
+            title: const Text('Chatbot löschen'),
             content: Text(
-              'Möchten Sie das Projekt "$projectName" wirklich löschen?',
+              'Möchten Sie den Chatbot "$projectName" wirklich löschen?',
             ),
             actions: [
               TextButton(
@@ -105,11 +105,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Neues Projekt erstellen'),
+            title: const Text('Neuen Chatbot erstellen'),
             content: TextField(
               controller: controller,
               decoration: const InputDecoration(
-                hintText: 'Projektname eingeben',
+                hintText: 'Chatbotname eingeben',
               ),
             ),
             actions: [
@@ -126,7 +126,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                   } else {
                     SnackbarService.showError(
                       context,
-                      'Bitte einen Projektname eingeben',
+                      'Bitte einen Chatbotname eingeben',
                     );
                   }
                 },
@@ -143,12 +143,12 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       await _fetchProjects();
       SnackbarService.showSuccess(
         context,
-        'Projekt "$newName" wurde umbenannt',
+        'Chatbot "$newName" wurde umbenannt',
       );
     } catch (e) {
       SnackbarService.showError(
         context,
-        'Fehler beim Umbenennen des Projekts: $e',
+        'Fehler beim Umbenennen des Chatbots: $e',
       );
     }
   }
@@ -161,11 +161,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Projekt bearbeiten'),
+            title: const Text('Chatbot bearbeiten'),
             content: TextField(
               controller: controller,
               decoration: const InputDecoration(
-                hintText: 'Neuen Projektnamen eingeben',
+                hintText: 'Neuen Chatbotnamen eingeben',
               ),
             ),
             actions: [
@@ -182,7 +182,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
                   } else {
                     SnackbarService.showError(
                       context,
-                      'Bitte einen neuen Projektnamen eingeben',
+                      'Bitte einen neuen Chatbotnamen eingeben',
                     );
                   }
                 },
@@ -197,12 +197,12 @@ class ProjectListScreenState extends State<ProjectListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Projekte'),
+        title: const Text('Chatbots'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: _showAddProjectDialog,
-            tooltip: 'Neues Projekt hinzufügen',
+            tooltip: 'Neuen Chatbot hinzufügen',
           ),
         ],
       ),
@@ -213,7 +213,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _projects.isEmpty
-                  ? const Center(child: Text('Keine Projekte vorhanden'))
+                  ? const Center(child: Text('Keine Chatbots erstellt'))
                   : ListView.builder(
                     padding: const EdgeInsets.all(8.0),
                     itemCount: _projects.length,
