@@ -1,15 +1,19 @@
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:intl/intl.dart';
 import 'dart:convert';
+import 'dart:io';
 import '../Config/app_config.dart';
+import '../models/processing_status.dart';
 
 class FileService {
   final DatabaseReference _db = FirebaseDatabase.instance.ref().child(
     AppConfig.firebaseFilesPath,
   );
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   Future<List<List<Map<String, dynamic>>>> fetchFiles(
     String projectName,
@@ -35,6 +39,11 @@ class FileService {
 
             if (value.containsKey('keywords')) {
               fileData['keywords'] = value['keywords'];
+            }
+
+            // Storage-URL hinzufügen, falls vorhanden
+            if (value.containsKey('storageURL')) {
+              fileData['storageURL'] = value['storageURL'] as String?;
             }
 
             if (value.containsKey('summary')) {
@@ -97,20 +106,114 @@ class FileService {
     }
   }
 
+  /// Lädt eine Datei in Firebase Storage hoch
+  Future<String> uploadFileToStorage(
+    String projectName,
+    String fileName,
+    String filePath,
+    Uint8List? fileBytes,
+  ) async {
+    try {
+      // Erstelle den Storage-Pfad: /files/project/dateiname
+      final storageRef = _storage.ref().child('files/$projectName/$fileName');
+      
+      UploadTask uploadTask;
+      
+      if (fileBytes != null) {
+        // Verwende Bytes wenn verfügbar (funktioniert auf allen Plattformen)
+        uploadTask = storageRef.putData(
+          fileBytes,
+          SettableMetadata(
+            contentType: 'application/pdf',
+            customMetadata: {
+              'project': projectName,
+              'uploadDate': DateTime.now().toIso8601String(),
+            },
+          ),
+        );
+      } else {
+        // Fallback: Verwende Datei-Pfad für Mobile/Desktop
+        final file = File(filePath);
+        uploadTask = storageRef.putFile(
+          file,
+          SettableMetadata(
+            contentType: 'application/pdf',
+            customMetadata: {
+              'project': projectName,
+              'uploadDate': DateTime.now().toIso8601String(),
+            },
+          ),
+        );
+      }
+
+      final snapshot = await uploadTask;
+      final downloadURL = await snapshot.ref.getDownloadURL();
+      
+      debugPrint('Datei erfolgreich zu Firebase Storage hochgeladen: $downloadURL');
+      return downloadURL;
+    } catch (e) {
+      debugPrint('Fehler beim Upload zu Firebase Storage: $e');
+      throw Exception('Fehler beim Storage-Upload: $e');
+    }
+  }
+
+  /// Löscht eine Datei aus Firebase Storage
+  Future<void> deleteFileFromStorage(
+    String projectName,
+    String fileName,
+  ) async {
+    try {
+      // Erstelle den Storage-Pfad: /files/project/dateiname
+      final storageRef = _storage.ref().child('files/$projectName/$fileName');
+      
+      await storageRef.delete();
+      debugPrint('Datei erfolgreich aus Firebase Storage gelöscht: $fileName');
+    } catch (e) {
+      debugPrint('Fehler beim Löschen aus Firebase Storage: $e');
+      // Fehler nicht werfen, da die Datei möglicherweise bereits gelöscht wurde
+      // oder nicht existiert
+    }
+  }
+
   Future<Map<String, dynamic>> startTask(
     String filePath,
     Uint8List fileBytes,
     String fileName,
     String projectName,
     String fileID,
+    String additionalInfo,
     List<String> taskIDs,
   ) async {
     try {
+      // 1. Zuerst Datei zu Firebase Storage hochladen
+      String? storageURL;
+      try {
+        storageURL = await uploadFileToStorage(
+          projectName,
+          fileName,
+          filePath,
+          kIsWeb ? fileBytes : null,
+        );
+        
+        // Speichere die Storage-URL in der Datenbank
+        await _db.child('$projectName/$fileID').update({
+          'storageURL': storageURL,
+        });
+      } catch (storageError) {
+        debugPrint('Warnung: Storage-Upload fehlgeschlagen: $storageError');
+        // Setze trotzdem mit der API-Verarbeitung fort
+      }
+
+      // 2. Dann normale API-Verarbeitung starten
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
 
       request.fields['namespace'] = projectName;
       request.fields['fileID'] = fileID;
+      request.fields['additional_info'] = additionalInfo;
+      if (storageURL != null) {
+        request.fields['storageURL'] = storageURL;
+      }
 
       if (kIsWeb) {
         request.files.add(
@@ -131,6 +234,10 @@ class FileService {
       final jsonResponse = json.decode(responseBody.body);
 
       if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        // Wenn API-Upload fehlschlägt, lösche die Storage-Datei wieder
+        if (storageURL != null) {
+          await deleteFileFromStorage(projectName, fileName);
+        }
         throw Exception(
           'Upload fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}',
         );
@@ -158,6 +265,10 @@ class FileService {
     bool justFirebase,
   ) async {
     try {
+      // 1. Zuerst aus Firebase Storage löschen
+      await deleteFileFromStorage(projectName, fileName);
+
+      // 2. Dann normale API-Löschung
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete');
       final request =
           http.MultipartRequest('POST', uri)
@@ -176,12 +287,16 @@ class FileService {
         );
       }
     } catch (e) {
-      throw Exception('Fehler beim Löschen der Dei: $e');
+      throw Exception('Fehler beim Löschen der Datei: $e');
     }
   }
 
   Future<void> deleteAllVectors(String projectName) async {
     try {
+      // 1. Zuerst alle Dateien aus Firebase Storage löschen
+      await deleteAllFilesFromStorage(projectName);
+
+      // 2. Dann normale API-Löschung aller Vektoren
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/delete_all');
       final request = http.MultipartRequest('POST', uri)
         ..fields['namespace'] = projectName;
@@ -197,6 +312,32 @@ class FileService {
       }
     } catch (e) {
       throw Exception('Fehler beim Löschen aller Vektoren: $e');
+    }
+  }
+
+  /// Löscht alle Dateien eines Projekts aus Firebase Storage
+  Future<void> deleteAllFilesFromStorage(String projectName) async {
+    try {
+      final projectRef = _storage.ref().child('files/$projectName');
+      
+      // Liste alle Dateien im Projekt-Ordner auf
+      final listResult = await projectRef.listAll();
+      
+      // Lösche alle gefundenen Dateien
+      for (final item in listResult.items) {
+        try {
+          await item.delete();
+          debugPrint('Datei aus Storage gelöscht: ${item.name}');
+        } catch (e) {
+          debugPrint('Fehler beim Löschen von ${item.name}: $e');
+          // Einzelne Fehler nicht weiterwerfen, damit andere Dateien trotzdem gelöscht werden
+        }
+      }
+      
+      debugPrint('Alle Dateien für Projekt $projectName aus Storage gelöscht');
+    } catch (e) {
+      debugPrint('Fehler beim Löschen aller Storage-Dateien: $e');
+      // Fehler nicht weiterwerfen, da dies ein sekundärer Prozess ist
     }
   }
 
@@ -216,6 +357,64 @@ class FileService {
       await _db.child('$projectName/$fileID').update(updates);
     } catch (e) {
       debugPrint('Fehler beim Update des Processing-Status: $e');
+    }
+  }
+
+  /// Verarbeitet den kompletten File Upload Workflow
+  Future<ProcessingStatus> processFileUpload({
+    required String filePath,
+    required Uint8List fileBytes,
+    required String fileName,
+    required String projectName,
+    required String additionalInfo,
+  }) async {
+    String? fileID;
+    
+    try {
+      // 1. Upload zu Firebase Database
+      fileID = await uploadToFirebase(projectName, fileName, filePath);
+      
+      // 2. Task starten (beinhaltet Storage Upload und API Call)
+      final response = await startTask(
+        filePath,
+        fileBytes,
+        fileName,
+        projectName,
+        fileID,
+        additionalInfo,
+        [],
+      );
+
+      if (response['status'] != 'success') {
+        throw Exception(response['message'] ?? 'Unbekannter Fehler');
+      }
+
+      // 3. Beschreibung speichern falls vorhanden
+      if (additionalInfo.isNotEmpty) {
+        await _db.child('$projectName/$fileID').update({
+          'additional_info': additionalInfo,
+        });
+      }
+
+      // 4. ProcessingStatus Objekt zurückgeben
+      return ProcessingStatus(
+        status: 'Verarbeitung gestartet',
+        progress: 0,
+        fileName: fileName,
+        fileID: '$projectName/$fileID',
+        processing: true,
+      );
+      
+    } catch (e) {
+      // Cleanup bei Fehler
+      if (fileID != null) {
+        try {
+          await deleteFile(fileName, projectName, fileID, true);
+        } catch (deleteError) {
+          debugPrint('Fehler beim Cleanup: $deleteError');
+        }
+      }
+      throw Exception('Fehler beim File Upload: $e');
     }
   }
 }

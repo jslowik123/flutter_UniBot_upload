@@ -100,7 +100,7 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _confirmSelection() async {
+  Future<void> _confirmSelection(String description) async {
     if (_filePath == null || _fileName == null || _projectName == null) {
       _showErrorSnackBar('Bitte wählen Sie zuerst eine Datei aus');
       return;
@@ -108,60 +108,26 @@ class _FileScreenState extends State<FileScreen> {
 
     setState(() => _isLoading = true);
     try {
-      _fileID = await _fileService.uploadToFirebase(
-        _projectName!,
-        _fileName!,
-        _filePath!,
+      final processingStatus = await _fileService.processFileUpload(
+        filePath: _filePath!,
+        fileBytes: _fileBytes,
+        fileName: _fileName!,
+        projectName: _projectName!,
+        additionalInfo: description,
       );
-
-      final response = await _fileService.startTask(
-        _filePath!,
-        _fileBytes,
-        _fileName!,
-        _projectName!,
-        _fileID!,
-        [],
-      );
-
-      if (response['status'] == 'success') {
-        setState(() {
-          _processingFiles.add(
-            ProcessingStatus(
-              status: 'Verarbeitung gestartet',
-              progress: 0,
-              fileName: _fileName!,
-              fileID: '$_projectName/$_fileID',
-              processing: true,
-            ),
-          );
-        });
-
-        _showSuccessSnackBar('Upload gestartet');
-      } else {
-        throw Exception(response['message'] ?? 'Unbekannter Fehler');
-      }
 
       setState(() {
+        _processingFiles.add(processingStatus);
         _isLoading = false;
         _filePicked = false;
         _fileName = null;
         _filePath = null;
         _fileID = null;
       });
+
+      _showSuccessSnackBar('Upload gestartet');
     } catch (e) {
       debugPrint('Upload Fehler: $e');
-      if (_fileID != null) {
-        try {
-          await _fileService.deleteFile(
-            _fileName!,
-            _projectName!,
-            _fileID!,
-            true,
-          );
-        } catch (deleteError) {
-          debugPrint('Fehler beim Löschen: $deleteError');
-        }
-      }
       _showErrorSnackBar('Fehler beim Upload: $e');
       setState(() => _isLoading = false);
     }

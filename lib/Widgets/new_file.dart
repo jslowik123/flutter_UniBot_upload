@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-class NewFile extends StatelessWidget {
+class NewFile extends StatefulWidget {
   final String? fileName;
   final Future<void> Function() pickFileFunc;
-  final VoidCallback confirmSelectionFunc;
+  final Function(String) confirmSelectionFunc;
   final bool filePicked;
 
   const NewFile({
@@ -15,9 +15,38 @@ class NewFile extends StatelessWidget {
   });
 
   @override
+  State<NewFile> createState() => _NewFileState();
+}
+
+class _NewFileState extends State<NewFile> {
+  late TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _textController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _handleConfirmSelection() {
+    // Text speichern und an die Callback-Funktion übergeben
+    final text = _textController.text;
+    widget.confirmSelectionFunc(text);
+    
+    // Textfeld nach dem Bestätigen clearen
+    _textController.clear();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: EdgeInsets.all(widget.filePicked ? 24.0 : 16.0),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -36,7 +65,7 @@ class NewFile extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: pickFileFunc,
+                onPressed: widget.pickFileFunc,
                 icon: const Icon(Icons.upload_file),
                 label: const Text('Datei auswählen'),
                 style: ElevatedButton.styleFrom(
@@ -48,7 +77,7 @@ class NewFile extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               ElevatedButton.icon(
-                onPressed: confirmSelectionFunc,
+                onPressed: _handleConfirmSelection,
                 icon: const Icon(Icons.check),
                 label: const Text('Bestätigen'),
                 style: ElevatedButton.styleFrom(
@@ -70,16 +99,36 @@ class NewFile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              filePicked && fileName != null
-                  ? 'Ausgewählte Datei: $fileName'
+              widget.filePicked && widget.fileName != null
+                  ? 'Ausgewählte Datei: ${widget.fileName}'
                   : 'Keine Datei ausgewählt',
               style: TextStyle(
                 fontSize: 16,
-                color: filePicked ? Colors.black87 : Colors.grey,
+                color: widget.filePicked ? Colors.black87 : Colors.grey,
               ),
               textAlign: TextAlign.center,
             ),
           ),
+          // Textfeld erscheint nur wenn eine Datei ausgewählt wurde
+          if (widget.filePicked) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              child: TextField(
+                controller: _textController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Beschreibung oder Notizen',
+                  hintText: 'Geben Sie hier zusätzliche Informationen ein...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  fillColor: Colors.grey[50],
+                  filled: true,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
