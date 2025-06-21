@@ -22,6 +22,7 @@ class FileTile extends StatelessWidget {
         summaryPoints.isNotEmpty
             ? summaryPoints.join('\n')
             : 'Keine Zusammenfassung verfügbar';
+    final String? additionalInfo = file['additional_info'] as String?;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -58,6 +59,15 @@ class FileTile extends StatelessWidget {
                             )
                             .toList(),
                   ),
+                  const SizedBox(height: 16),
+                ],
+                if (additionalInfo != null && additionalInfo.isNotEmpty) ...[
+                  const Text(
+                    'Zusätzliche Informationen:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(additionalInfo),
                   const SizedBox(height: 16),
                 ],
                 const Text(

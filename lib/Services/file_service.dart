@@ -46,6 +46,11 @@ class FileService {
               fileData['storageURL'] = value['storageURL'] as String?;
             }
 
+            // Additional Info hinzufügen, falls vorhanden
+            if (value.containsKey('additional_info')) {
+              fileData['additional_info'] = value['additional_info'] as String?;
+            }
+
             if (value.containsKey('summary')) {
               final summaryData = value['summary'];
               if (summaryData is Map) {
@@ -203,17 +208,17 @@ class FileService {
         debugPrint('Warnung: Storage-Upload fehlgeschlagen: $storageError');
         // Setze trotzdem mit der API-Verarbeitung fort
       }
-
+      if (additionalInfo.isEmpty) {
+        additionalInfo = 'Keine zusätzlichen Informationen';
+      }
       // 2. Dann normale API-Verarbeitung starten
       final uri = Uri.parse('${AppConfig.apiBaseUrl}/upload');
       final request = http.MultipartRequest('POST', uri);
 
       request.fields['namespace'] = projectName;
       request.fields['fileID'] = fileID;
-      request.fields['additional_info'] = additionalInfo;
-      if (storageURL != null) {
-        request.fields['storageURL'] = storageURL;
-      }
+      request.fields['additionalInfo'] = additionalInfo;
+      
 
       if (kIsWeb) {
         request.files.add(
