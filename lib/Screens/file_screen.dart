@@ -6,9 +6,11 @@ import '/Widgets/file_tile.dart';
 import '/Widgets/new_file.dart';
 import '/Services/file_service.dart';
 import '/Widgets/help_dialog.dart';
+import '/Widgets/help_content.dart';
 import '/Services/snackbar_service.dart';
 import '../models/processing_status.dart';
 import '../widgets/processing_status_tile.dart';
+import '/Services/project_service.dart';
 
 class FileScreen extends StatefulWidget {
   const FileScreen({super.key});
@@ -19,6 +21,9 @@ class FileScreen extends StatefulWidget {
 
 class _FileScreenState extends State<FileScreen> {
   final FileService _fileService = FileService();
+  final ProjectService _projectService = ProjectService();
+  final TextEditingController _projectInfoController = TextEditingController();
+  String _initialProjectInfo = '';
   String? _filePath;
   String? _fileName;
   bool _filePicked = false;
@@ -26,6 +31,7 @@ class _FileScreenState extends State<FileScreen> {
   List<Map<String, dynamic>> _importedFiles = [];
   bool _isInitialized = false;
   bool _isLoading = false;
+  bool _isSavingProjectInfo = false;
   Map<String, dynamic>? _routeArgs;
   late Uint8List _fileBytes;
   String? _projectName;
@@ -34,10 +40,12 @@ class _FileScreenState extends State<FileScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    print('[didChangeDependencies] _isInitialized=$_isInitialized, _projectName=$_projectName');
     if (!_isInitialized) {
       _routeArgs =
           ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _projectName = _routeArgs?['name'];
+      print('[didChangeDependencies] routeArgs=$_routeArgs, _projectName=$_projectName');
       _initializeScreen();
       _isInitialized = true;
     }
@@ -46,6 +54,45 @@ class _FileScreenState extends State<FileScreen> {
   Future<void> _initializeScreen() async {
     if (_projectName == null) return;
     await _fetchFilesFromDatabase();
+    await _loadProjectInfo();
+  }
+
+  Future<void> _loadProjectInfo() async {
+    print('[loadProjectInfo] called for $_projectName');
+    if (_projectName == null) {
+      _projectInfoController.text = '';
+      _initialProjectInfo = '';
+      setState(() {});
+      print('[loadProjectInfo] _projectName is null, set empty');
+      return;
+    }
+    try {
+      final info = await _projectService.getProjectInfo(_projectName!);
+      _projectInfoController.text = info;
+      _initialProjectInfo = info;
+      setState(() {});
+      print('[loadProjectInfo] loaded info: $info');
+    } catch (e) {
+      _projectInfoController.text = '';
+      _initialProjectInfo = '';
+      setState(() {});
+      print('[loadProjectInfo] error: $e, set empty');
+    }
+  }
+
+  Future<void> _saveProjectInfo() async {
+    if (_projectName == null) return;
+    setState(() => _isSavingProjectInfo = true);
+    try {
+      await _projectService.setProjectInfo(_projectName!, _projectInfoController.text);
+      SnackbarService.showSuccess(context, 'Projektinfo gespeichert');
+      _initialProjectInfo = _projectInfoController.text;
+      setState(() {});
+    } catch (e) {
+      SnackbarService.showError(context, 'Fehler beim Speichern der Projektinfo');
+    } finally {
+      setState(() => _isSavingProjectInfo = false);
+    }
   }
 
   Future<void> _fetchFilesFromDatabase() async {
@@ -182,13 +229,31 @@ class _FileScreenState extends State<FileScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _projectInfoController.addListener(_onProjectInfoChanged);
+  }
+
+  @override
+  void dispose() {
+    _projectInfoController.removeListener(_onProjectInfoChanged);
+    _projectInfoController.dispose();
+    super.dispose();
+  }
+
+  void _onProjectInfoChanged() {
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    print('[build] _projectName=$_projectName, _isLoading=$_isLoading, _importedFiles=${_importedFiles.length}, _processingFiles=${_processingFiles.length}');
     return Scaffold(
       appBar: AppBar(
         title: Text(_projectName ?? "unbekannt"),
         actions: [
           IconButton(
-            onPressed: () => HelpDialog.show(context),
+            onPressed: () => HelpDialog.show(context, HelpContent.pages),
             icon: const Icon(Icons.help_outline),
           ),
         ],
@@ -198,28 +263,84 @@ class _FileScreenState extends State<FileScreen> {
           constraints: const BoxConstraints(maxWidth: 800),
           child: Stack(
             children: [
-              !_isLoading && _importedFiles.isEmpty && _processingFiles.isEmpty
-                  ? const Center(child: Text('Keine Dateien vorhanden'))
-                  : ListView(
-                    padding: const EdgeInsets.only(bottom: 120.0),
-                    children: [
-                      ..._processingFiles.map(
-                        (file) => ProcessingStatusTile(
-                          status: file,
-                          onStatusUpdate:
-                              (status) => _handleStatusUpdate(file, status),
-                          projectName: _projectName!,
-                        ),
+              ListView(
+                padding: const EdgeInsets.only(bottom: 120.0),
+                children: [
+                  Card(
+                    margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Projekt-Notizen für den Chatbot',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              SizedBox(width: 8),
+                              Tooltip(
+                                message: 'Hier kannst du wichtige Hinweise, Ziele oder Kontext für dieses Projekt eintragen. Diese Infos werden dem Chatbot zusätzlich zu den Dokumenten bereitgestellt.',
+                                child: Icon(Icons.info_outline, size: 18, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          TextFormField(
+                            controller: _projectInfoController,
+                            minLines: 2,
+                            maxLines: 6,
+                            decoration: InputDecoration(
+                              hintText: 'z.B. "Bitte beachte, dass ich im 3. Semester bin und mich besonders für Wahlpflichtmodule interessiere."',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: (_projectInfoController.text != _initialProjectInfo)
+                                ? ElevatedButton.icon(
+                                    onPressed: _isSavingProjectInfo ? null : _saveProjectInfo,
+                                    icon: _isSavingProjectInfo
+                                        ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : Icon(Icons.save),
+                                    label: Text('Speichern'),
+                                  )
+                                : SizedBox.shrink(),
+                          ),
+                        ],
                       ),
-                      ..._importedFiles.map(
-                        (file) => FileTile(
-                          file: file,
-                          deleteFileFunc:
-                              () => _deleteFile(file['path']!, file['name']!),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                  if (_isLoading)
+                    const Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else ...[
+                    if (_processingFiles.isEmpty && _importedFiles.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Center(child: Text('Keine Dateien vorhanden')),
+                      ),
+                    ..._processingFiles.map(
+                      (file) => ProcessingStatusTile(
+                        status: file,
+                        onStatusUpdate: (status) => _handleStatusUpdate(file, status),
+                        projectName: _projectName!,
+                      ),
+                    ),
+                    ..._importedFiles.map(
+                      (file) => FileTile(
+                        file: file,
+                        deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -231,7 +352,6 @@ class _FileScreenState extends State<FileScreen> {
                   filePicked: _filePicked,
                 ),
               ),
-              if (_isLoading) const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),

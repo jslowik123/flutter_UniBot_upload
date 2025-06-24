@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
-import 'help_content.dart';
 
 class HelpDialog extends StatefulWidget {
-  const HelpDialog({super.key});
+  final List<Map<String, dynamic>> pages;
+
+  const HelpDialog({super.key, required this.pages});
 
   @override
   State<HelpDialog> createState() => _HelpDialogState();
 
-  static void show(BuildContext context) {
+  static void show(BuildContext context, List<Map<String, dynamic>> pages) {
     showDialog(
       context: context,
-      builder:
-          (context) => Dialog(
+      builder: (context) => Dialog(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12.0),
-              child: const SizedBox(
+          child: SizedBox(
                 width: 900,
                 height: 700,
-                child: HelpDialog(),
+            child: HelpDialog(pages: pages),
               ),
             ),
           ),
@@ -38,7 +38,7 @@ class _HelpDialogState extends State<HelpDialog> {
         foregroundColor: Colors.grey[800],
         elevation: 1,
         title: Text(
-          'Hilfe (${_currentPage + 1}/${HelpContent.pages.length})',
+          'Hilfe (${_currentPage + 1}/${widget.pages.length})',
           style: TextStyle(
             fontWeight: FontWeight.w600,
             fontSize: 18,
@@ -56,8 +56,8 @@ class _HelpDialogState extends State<HelpDialog> {
       body: PageView.builder(
         controller: _pageController,
         onPageChanged: (index) => setState(() => _currentPage = index),
-        itemCount: HelpContent.pages.length,
-        itemBuilder: (context, index) => _buildPage(HelpContent.pages[index]),
+        itemCount: widget.pages.length,
+        itemBuilder: (context, index) => _buildPage(widget.pages[index]),
       ),
       bottomNavigationBar: _buildBottomBar(),
     );
@@ -250,90 +250,70 @@ class _HelpDialogState extends State<HelpDialog> {
 
   Widget _buildBottomBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+      decoration: const BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
+        border: Border(
+          top: BorderSide(color: Colors.black12, width: 1.0),
           ),
-        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          ElevatedButton.icon(
+          _buildNavButton(
+            icon: Icons.arrow_back_ios,
             onPressed: _currentPage > 0 ? _previousPage : null,
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: const Text('Zurück'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[200],
-              foregroundColor: Colors.grey[700],
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
           ),
           Row(
             children: List.generate(
-              HelpContent.pages.length,
+              widget.pages.length,
               (index) => Container(
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 8,
-                height: 8,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
-                  color:
-                      index == _currentPage
-                          ? Colors.grey[600]
-                          : Colors.grey[300],
                   shape: BoxShape.circle,
+                  color: _currentPage == index ? Colors.blue : Colors.grey[300],
                 ),
               ),
             ),
           ),
-          ElevatedButton.icon(
-            onPressed: _nextPageOrClose,
-            icon: Icon(
-              _isLastPage ? Icons.check : Icons.arrow_forward,
-              size: 18,
-            ),
-            label: Text(_isLastPage ? 'Abschließen' : 'Weiter'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey[700],
-              foregroundColor: Colors.white,
-              elevation: 1,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
+          _buildNavButton(
+            icon: Icons.arrow_forward_ios,
+            onPressed: !_isLastPage ? _nextPage : null,
           ),
         ],
       ),
     );
   }
 
-  bool get _isLastPage => _currentPage >= HelpContent.pages.length - 1;
+  Widget _buildNavButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      icon: Icon(icon, color: onPressed != null ? Colors.blue : Colors.grey),
+      onPressed: onPressed,
+      splashRadius: 24,
+      tooltip: onPressed != null
+          ? (icon == Icons.arrow_back_ios ? 'Zurück' : 'Weiter')
+          : null,
+    );
+  }
+
+  bool get _isLastPage => _currentPage >= widget.pages.length - 1;
 
   void _previousPage() {
     _pageController.previousPage(
       duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
+      curve: Curves.ease,
     );
   }
 
-  void _nextPageOrClose() {
-    if (_isLastPage) {
-      Navigator.pop(context);
-    } else {
+  void _nextPage() {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
+      curve: Curves.ease,
       );
-    }
   }
 }

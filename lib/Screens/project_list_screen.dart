@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../Widgets/project_tile.dart';
 import '../Services/project_service.dart';
 import '../Services/snackbar_service.dart';
+import '../Widgets/help_dialog.dart';
+import '../Widgets/project_help_content.dart';
+import 'new_project_screen.dart';
 
 class ProjectListScreen extends StatefulWidget {
   const ProjectListScreen({super.key});
@@ -29,11 +32,14 @@ class ProjectListScreenState extends State<ProjectListScreen> {
         _projects.addAll(projects);
         _isLoading = false;
       });
+      // Nach dem Laden der Projekte: Projektinfos cachen
+      final projectNames = projects.map((p) => p['name'] as String).toList();
+      await _projectService.preloadAllProjectInfos(projectNames);
     } catch (e) {
       setState(() {
         _isLoading = false;
       });
-      SnackbarService.showError(context, 'Fehler beim Laden der Chatbots: $e');
+      SnackbarService.showError(context, 'Fehler beim Laden der Projekte: $e');
     }
   }
 
@@ -41,11 +47,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     try {
       await _projectService.addProject(projectName);
       await _fetchProjects();
-      SnackbarService.showSuccess(context, 'Chatbot "$projectName" erstellt');
+      SnackbarService.showSuccess(context, 'Projekt "$projectName" erstellt');
     } catch (e) {
       SnackbarService.showError(
         context,
-        'Fehler beim Erstellen des Chatbots: $e',
+        'Fehler beim Erstellen des Projekts: $e',
       );
     }
   }
@@ -54,13 +60,69 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     try {
       await _projectService.deleteProject(projectName);
       await _fetchProjects();
-      SnackbarService.showSuccess(context, 'Chatbot gelöscht');
+      SnackbarService.showSuccess(context, 'Projekt gelöscht');
     } catch (e) {
       SnackbarService.showError(
         context,
-        'Fehler beim Löschen des Chatbots: $e',
+        'Fehler beim Löschen des Projekts: $e',
       );
     }
+  }
+
+  Future<void> _updateProjectName(String oldName, String newName) async {
+    try {
+      await _projectService.updateProjectName(oldName, newName);
+      await _fetchProjects();
+      SnackbarService.showSuccess(
+        context,
+        'Projekt "$newName" wurde umbenannt',
+      );
+    } catch (e) {
+      SnackbarService.showError(
+        context,
+        'Fehler beim Umbenennen des Projekts: $e',
+      );
+    }
+  }
+
+  Future<void> _editProject(String projectName) async {
+    final TextEditingController controller = TextEditingController();
+    controller.text = projectName;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Projekt bearbeiten'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                hintText: 'Neuen Projektnamen eingeben',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Abbrechen'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final newName = controller.text.trim();
+                  if (newName.isNotEmpty && newName != projectName) {
+                    await _updateProjectName(projectName, newName);
+                    Navigator.pop(context);
+                  } else {
+                    SnackbarService.showError(
+                      context,
+                      'Bitte einen neuen Projektnamen eingeben',
+                    );
+                  }
+                },
+                child: const Text('Ändern'),
+              ),
+            ],
+          ),
+    );
   }
 
   void _showDeleteConfirmationDialog(String projectName) {
@@ -68,9 +130,9 @@ class ProjectListScreenState extends State<ProjectListScreen> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('Chatbot löschen'),
+            title: const Text('Projekt löschen'),
             content: Text(
-              'Möchten Sie den Chatbot "$projectName" wirklich löschen?',
+              'Möchten Sie das Projekt "$projectName" wirklich löschen?',
             ),
             actions: [
               TextButton(
@@ -98,111 +160,26 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     ).pushNamed('/projectView', arguments: {'name': project['name']});
   }
 
-  void _showAddProjectDialog() {
-    final TextEditingController controller = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Neuen Chatbot erstellen'),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Chatbotname eingeben',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Abbrechen'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final name = controller.text.trim();
-                  if (name.isNotEmpty) {
-                    await _addProject(name);
-                    Navigator.pop(context);
-                  } else {
-                    SnackbarService.showError(
-                      context,
-                      'Bitte einen Chatbotname eingeben',
-                    );
-                  }
-                },
-                child: const Text('Erstellen'),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Future<void> _updateProjectName(String oldName, String newName) async {
-    try {
-      await _projectService.updateProjectName(oldName, newName);
-      await _fetchProjects();
-      SnackbarService.showSuccess(
-        context,
-        'Chatbot "$newName" wurde umbenannt',
-      );
-    } catch (e) {
-      SnackbarService.showError(
-        context,
-        'Fehler beim Umbenennen des Chatbots: $e',
-      );
-    }
-  }
-
-  Future<void> _editProject(String projectName) async {
-    final TextEditingController controller = TextEditingController();
-    controller.text = projectName;
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Chatbot bearbeiten'),
-            content: TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Neuen Chatbotnamen eingeben',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Abbrechen'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final newName = controller.text.trim();
-                  if (newName.isNotEmpty && newName != projectName) {
-                    await _updateProjectName(projectName, newName);
-                    Navigator.pop(context);
-                  } else {
-                    SnackbarService.showError(
-                      context,
-                      'Bitte einen neuen Chatbotnamen eingeben',
-                    );
-                  }
-                },
-                child: const Text('Ändern'),
-              ),
-            ],
-          ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chatbots'),
+        title: const Text('Projekte'),
+        centerTitle: true,
         actions: [
           IconButton(
+            onPressed: () => HelpDialog.show(context, ProjectHelpContent.pages),
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Hilfe',
+          ),
+          IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _showAddProjectDialog,
-            tooltip: 'Neuen Chatbot hinzufügen',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => NewProjectScreen(onProjectCreated: _addProject)),
+              );
+            },
+            tooltip: 'Neues Projekt erstellen',
           ),
         ],
       ),
@@ -213,7 +190,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
               _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _projects.isEmpty
-                  ? const Center(child: Text('Keine Chatbots erstellt'))
+                  ? const Center(child: Text('Keine Projekte erstellt'))
                   : ListView.builder(
                     padding: const EdgeInsets.all(8.0),
                     itemCount: _projects.length,

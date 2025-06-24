@@ -9,6 +9,9 @@ class ProjectService {
     AppConfig.firebaseFilesPath,
   );
 
+  // In-Memory-Cache für Projektinfos
+  final Map<String, String> _projectInfoCache = {};
+
   String getFormattedDate() {
     final DateTime now = DateTime.now();
     final DateFormat formatter = DateFormat('dd.MM.yyyy');
@@ -88,5 +91,44 @@ class ProjectService {
 
     await newProjectRef.set(data);
     await oldProjectRef.remove();
+  }
+
+  Future<String> getProjectInfo(String projectName) async {
+    if (_projectInfoCache.containsKey(projectName)) {
+      return _projectInfoCache[projectName]!;
+    }
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/get_project_info?project_name=$projectName'),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final info = data['info'] ?? '';
+      _projectInfoCache[projectName] = info;
+      return info;
+    } else {
+      throw Exception('Fehler beim Abrufen der Projektinfo');
+    }
+  }
+
+  Future<void> setProjectInfo(String projectName, String info) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/set_project_info'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {'project_name': projectName, 'info': info},
+    );
+    if (response.statusCode == 200) {
+      _projectInfoCache[projectName] = info;
+    } else {
+      throw Exception('Fehler beim Speichern der Projektinfo');
+    }
+  }
+
+  // Methode zum Initialisieren des Caches für alle Projekte
+  Future<void> preloadAllProjectInfos(List<String> projectNames) async {
+    for (final name in projectNames) {
+      try {
+        await getProjectInfo(name);
+      } catch (_) {}
+    }
   }
 }
