@@ -247,113 +247,54 @@ class _FileScreenState extends State<FileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[build] _projectName=$_projectName, _isLoading=$_isLoading, _importedFiles=${_importedFiles.length}, _processingFiles=${_processingFiles.length}');
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_projectName ?? "unbekannt"),
-        actions: [
-          IconButton(
-            onPressed: () => HelpDialog.show(context, HelpContent.pages),
-            icon: const Icon(Icons.help_outline),
-          ),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Stack(
-            children: [
-              ListView(
-                padding: const EdgeInsets.only(bottom: 120.0),
-                children: [
-                  Card(
-                    margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
-                    elevation: 2,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Projekt-Notizen für den Chatbot',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                              SizedBox(width: 8),
-                              Tooltip(
-                                message: 'Hier kannst du wichtige Hinweise, Ziele oder Kontext für dieses Projekt eintragen. Diese Infos werden dem Chatbot zusätzlich zu den Dokumenten bereitgestellt.',
-                                child: Icon(Icons.info_outline, size: 18, color: Colors.grey[600]),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 12),
-                          TextFormField(
-                            controller: _projectInfoController,
-                            minLines: 2,
-                            maxLines: 6,
-                            decoration: InputDecoration(
-                              hintText: 'z.B. "Bitte beachte, dass ich im 3. Semester bin und mich besonders für Wahlpflichtmodule interessiere."',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          SizedBox(height: 12),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: (_projectInfoController.text != _initialProjectInfo)
-                                ? ElevatedButton.icon(
-                                    onPressed: _isSavingProjectInfo ? null : _saveProjectInfo,
-                                    icon: _isSavingProjectInfo
-                                        ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                        : Icon(Icons.save),
-                                    label: Text('Speichern'),
-                                  )
-                                : SizedBox.shrink(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_isLoading)
+    print('[build] _projectName=\u001b[0m_projectName, _isLoading=\u001b[0m_isLoading, _importedFiles=\u001b[0m_importedFiles.length, _processingFiles=\u001b[0m_processingFiles.length');
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: Stack(
+          children: [
+            ListView(
+              padding: const EdgeInsets.only(bottom: 120.0),
+              children: [
+                if (_isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  if (_processingFiles.isEmpty && _importedFiles.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(32.0),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else ...[
-                    if (_processingFiles.isEmpty && _importedFiles.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Center(child: Text('Keine Dateien vorhanden')),
-                      ),
-                    ..._processingFiles.map(
-                      (file) => ProcessingStatusTile(
-                        status: file,
-                        onStatusUpdate: (status) => _handleStatusUpdate(file, status),
-                        projectName: _projectName!,
-                      ),
+                      child: Center(child: Text('Keine Dateien vorhanden')),
                     ),
-                    ..._importedFiles.map(
-                      (file) => FileTile(
-                        file: file,
-                        deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
-                      ),
+                  ..._processingFiles.map(
+                    (file) => ProcessingStatusTile(
+                      status: file,
+                      onStatusUpdate: (status) => _handleStatusUpdate(file, status),
+                      projectName: _projectName!,
                     ),
-                  ],
+                  ),
+                  ..._importedFiles.map(
+                    (file) => FileTile(
+                      file: file,
+                      deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
+                    ),
+                  ),
                 ],
+              ],
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: NewFile(
+                fileName: _fileName,
+                pickFileFunc: _pickFile,
+                confirmSelectionFunc: _confirmSelection,
+                filePicked: _filePicked,
               ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: NewFile(
-                  fileName: _fileName,
-                  pickFileFunc: _pickFile,
-                  confirmSelectionFunc: _confirmSelection,
-                  filePicked: _filePicked,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

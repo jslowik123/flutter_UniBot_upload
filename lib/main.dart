@@ -6,6 +6,7 @@ import 'Screens/project_list_screen.dart';
 import 'Screens/file_screen.dart';
 import 'Screens/server_unavailable_screen.dart';
 import 'package:http/http.dart' as http;
+import 'Screens/project_management_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,7 +66,7 @@ class _MyAppState extends State<MyApp> {
           }
         },
       ),
-      routes: {'/projectView': (context) => FileScreen()},
+      routes: {'/projectView': (context) => ProjectManagementScreen()},
     );
   }
 }
