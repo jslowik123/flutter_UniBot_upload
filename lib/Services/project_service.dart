@@ -155,6 +155,12 @@ class ProjectService {
     }
   }
 
+  // Methode zum Leeren des Caches für ein bestimmtes Projekt
+  void clearProjectCache(String projectName) {
+    _projectInfoCache.remove(projectName);
+    _projectAssessmentCache.remove(projectName);
+  }
+
   // Methode zum Initialisieren des Caches für alle Projekte
   Future<void> preloadAllProjectInfos(List<String> projectNames) async {
     for (final name in projectNames) {
