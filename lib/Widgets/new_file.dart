@@ -118,7 +118,7 @@ class _NewFileState extends State<NewFile> {
                 controller: _textController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  labelText: 'Beschreibung oder Notizen',
+                  labelText: 'Beschreibung oder Notizen...',
                   hintText: 'Geben Sie hier zusätzliche Informationen ein...',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),

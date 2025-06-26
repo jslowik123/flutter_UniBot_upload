@@ -129,17 +129,21 @@ class _FileScreenState extends State<FileScreen> {
       );
 
       if (result != null) {
-        _filePath = result.files.single.path;
         _fileName = result.files.single.name;
         if (kIsWeb) {
           final bytes = result.files.single.bytes;
           if (bytes != null) {
             _fileBytes = bytes;
+          } else {
+            _fileBytes = Uint8List(0);
           }
+          // Für Web verwenden wir immer den fileName als filePath fallback
+          _filePath = _fileName;
         } else {
-          _filePath = result.files.single.path;
+          _filePath = result.files.single.path ?? _fileName;
           _fileBytes = Uint8List(0);
         }
+        print('[_pickFile] Nach File-Pick: _filePath=$_filePath, _fileName=$_fileName, _filePicked=true');
         setState(() => _filePicked = true);
       }
     } catch (e) {
@@ -148,7 +152,8 @@ class _FileScreenState extends State<FileScreen> {
   }
 
   Future<void> _confirmSelection(String description) async {
-    if (_filePath == null || _fileName == null || _projectName == null) {
+    print('[_confirmSelection] _filePath=$_filePath, _fileName=$_fileName, _projectName=$_projectName');
+    if (_filePath == null) {
       _showErrorSnackBar('Bitte wählen Sie zuerst eine Datei aus');
       return;
     }

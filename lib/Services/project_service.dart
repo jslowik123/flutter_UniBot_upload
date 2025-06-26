@@ -9,13 +9,28 @@ class ProjectService {
     AppConfig.firebaseFilesPath,
   );
 
-  // In-Memory-Cache für Projektinfos
+  // In-Memory-Cache für Projektinfos und Assessments
   final Map<String, String> _projectInfoCache = {};
+  final Map<String, String> _projectAssessmentCache = {};
 
   String getFormattedDate() {
     final DateTime now = DateTime.now();
     final DateFormat formatter = DateFormat('dd.MM.yyyy');
     return formatter.format(now);
+  }
+  Future<void> sendProjectAssessment(String projectName, String additionalInfo) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/get_assessment_data');
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['namespace'] = projectName
+        ..fields['additional_info'] = additionalInfo;
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+    } catch (e) {
+      throw Exception('Fehler beim Abrufen der Projektbeurteilung: $e');
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchProjects() async {
@@ -103,11 +118,26 @@ class ProjectService {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final info = data['info'] ?? '';
+      final assessment = data['assessment'] ?? '';
+      
+      // Beide Werte im Cache speichern
       _projectInfoCache[projectName] = info;
+      _projectAssessmentCache[projectName] = assessment;
+      
       return info;
     } else {
       throw Exception('Fehler beim Abrufen der Projektinfo');
     }
+  }
+
+  Future<String> getProjectAssessmentData(String projectName) async {
+    if (_projectAssessmentCache.containsKey(projectName)) {
+      return _projectAssessmentCache[projectName]!;
+    }
+    
+    // Falls noch nicht im Cache, hole beide Werte
+    await getProjectInfo(projectName);
+    return _projectAssessmentCache[projectName] ?? '';
   }
 
   Future<void> setProjectInfo(String projectName, String info) async {
@@ -118,6 +148,8 @@ class ProjectService {
     );
     if (response.statusCode == 200) {
       _projectInfoCache[projectName] = info;
+      // Assessment-Cache invalidieren, da sich die Projektinfo geändert hat
+      _projectAssessmentCache.remove(projectName);
     } else {
       throw Exception('Fehler beim Speichern der Projektinfo');
     }
@@ -127,7 +159,7 @@ class ProjectService {
   Future<void> preloadAllProjectInfos(List<String> projectNames) async {
     for (final name in projectNames) {
       try {
-        await getProjectInfo(name);
+        await getProjectInfo(name); // Lädt automatisch auch das Assessment
       } catch (_) {}
     }
   }
