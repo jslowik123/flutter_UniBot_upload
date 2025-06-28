@@ -1,0 +1,81 @@
+import 'package:flutter/material.dart';
+import 'project_notes_card.dart';
+import 'progress_bar.dart';
+import 'project_assessment_card.dart';
+import 'project_knowledge_card.dart';
+
+class ProjectOverview extends StatelessWidget {
+  final TextEditingController projectInfoController;
+  final String initialProjectInfo;
+  final bool isSavingProjectInfo;
+  final String projectAssessment;
+  final bool isLoadingAssessment;
+  final VoidCallback? onSaveProjectInfo;
+  final VoidCallback? onRefreshAssessment;
+  final VoidCallback? onShowAssessmentDialog;
+  final String projectKnowledge;
+  final bool isLoadingKnowledge;
+  final VoidCallback? onRefreshKnowledge;
+  final VoidCallback? onNavigateToChatbot;
+  const ProjectOverview({
+    Key? key,
+    required this.projectInfoController,
+    required this.initialProjectInfo,
+    required this.isSavingProjectInfo,
+    required this.projectAssessment,
+    required this.isLoadingAssessment,
+    this.onSaveProjectInfo,
+    this.onRefreshAssessment,
+    this.onShowAssessmentDialog,
+    required this.projectKnowledge,
+    required this.isLoadingKnowledge,
+    this.onRefreshKnowledge,
+    this.onNavigateToChatbot,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // Projekt-Notizen Card
+              ProjectNotesCard(
+                controller: projectInfoController,
+                initialProjectInfo: initialProjectInfo,
+                isSavingProjectInfo: isSavingProjectInfo,
+                onSave: onSaveProjectInfo,
+              ),
+              
+              // Confidence Progress Bar (nur anzeigen wenn Assessment vorhanden)
+              if (projectAssessment.isNotEmpty && !isLoadingAssessment)
+                ProgressBar(
+                  projectAssessment: projectAssessment,
+                  onDetailsPressed: onShowAssessmentDialog,
+                ),
+              
+              // Schön formatierte Assessment Card
+              ProjectAssessmentCard(
+                projectAssessment: projectAssessment,
+                isLoadingAssessment: isLoadingAssessment,
+                onRefresh: onRefreshAssessment,
+              ),
+
+              // Schön formatierte Wissensbasis Card
+              ProjectKnowledgeCard(
+                projectKnowledge: projectKnowledge,
+                isLoadingKnowledge: isLoadingKnowledge,
+                onRefreshKnowledge: onRefreshKnowledge,
+                projectAssessment: projectAssessment,
+                onNavigateToChatbot: onNavigateToChatbot,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+} 

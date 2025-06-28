@@ -12,6 +12,7 @@ class ProjectService {
   // In-Memory-Cache für Projektinfos und Assessments
   final Map<String, String> _projectInfoCache = {};
   final Map<String, String> _projectAssessmentCache = {};
+  final Map<String, String> _projectKnowledgeCache = {};
 
   String getFormattedDate() {
     final DateTime now = DateTime.now();
@@ -119,15 +120,27 @@ class ProjectService {
       final data = json.decode(response.body);
       final info = data['info'] ?? '';
       final assessment = data['assessment'] ?? '';
+      final wissenstand = data['wissenstand'] ?? '';
       
-      // Beide Werte im Cache speichern
+      // Alle drei Werte im Cache speichern
       _projectInfoCache[projectName] = info;
       _projectAssessmentCache[projectName] = assessment;
+      _projectKnowledgeCache[projectName] = wissenstand;
       
       return info;
     } else {
       throw Exception('Fehler beim Abrufen der Projektinfo');
     }
+  }
+
+  Future<String> getProjectKnowledge(String projectName) async {
+    if (_projectKnowledgeCache.containsKey(projectName)) {
+      return _projectKnowledgeCache[projectName]!;
+    }
+    
+    // Falls noch nicht im Cache, hole alle Werte über getProjectInfo
+    await getProjectInfo(projectName);
+    return _projectKnowledgeCache[projectName] ?? '';
   }
 
   Future<String> getProjectAssessmentData(String projectName) async {
@@ -159,13 +172,14 @@ class ProjectService {
   void clearProjectCache(String projectName) {
     _projectInfoCache.remove(projectName);
     _projectAssessmentCache.remove(projectName);
+    _projectKnowledgeCache.remove(projectName);
   }
 
   // Methode zum Initialisieren des Caches für alle Projekte
   Future<void> preloadAllProjectInfos(List<String> projectNames) async {
     for (final name in projectNames) {
       try {
-        await getProjectInfo(name); // Lädt automatisch auch das Assessment
+        await getProjectInfo(name); // Lädt automatisch auch Assessment und Wissenstand
       } catch (_) {}
     }
   }

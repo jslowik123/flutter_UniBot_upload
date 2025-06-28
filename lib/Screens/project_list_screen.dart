@@ -43,9 +43,11 @@ class ProjectListScreenState extends State<ProjectListScreen> {
     }
   }
 
-  Future<void> _addProject(String projectName) async {
+  Future<void> _addProject(String projectName, String goals) async {
     try {
       await _projectService.addProject(projectName);
+      // Setze die Chatbot-Ziele als Projekt-Info
+      await _projectService.setProjectInfo(projectName, goals);
       await _fetchProjects();
       SnackbarService.showSuccess(context, 'Projekt "$projectName" erstellt');
     } catch (e) {

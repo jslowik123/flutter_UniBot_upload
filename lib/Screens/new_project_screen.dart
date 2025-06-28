@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class NewProjectScreen extends StatefulWidget {
-  final Future<void> Function(String) onProjectCreated;
+  final Future<void> Function(String, String) onProjectCreated;
   const NewProjectScreen({Key? key, required this.onProjectCreated}) : super(key: key);
 
   @override
@@ -9,19 +9,10 @@ class NewProjectScreen extends StatefulWidget {
 }
 
 class _NewProjectScreenState extends State<NewProjectScreen> {
-  int _currentStep = 0;
   final TextEditingController nameController = TextEditingController();
-  final TextEditingController customCategoryController = TextEditingController();
-  final List<String> categories = [
-    'Informatik',
-    'Wirtschaft',
-    'Psychologie',
-    'Medizin',
-    'Sonstiges (eigene Kategorie eingeben)'
-  ];
-  String selectedCategory = 'Informatik';
-  bool showCustomCategory = false;
+  final TextEditingController goalsController = TextEditingController();
   bool _dialogShown = false;
+  bool _isCreating = false;
 
   @override
   void didChangeDependencies() {
@@ -41,13 +32,15 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Neues Projekt erstellen'),
+                  Icon(Icons.add_circle_outline, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Text('Neues Projekt erstellen'),
+                  Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close),
                     tooltip: 'Abbrechen',
-                    onPressed: () {
+                    onPressed: _isCreating ? null : () {
                       Navigator.of(context).pop();
                       Navigator.of(context).pop();
                     },
@@ -55,101 +48,127 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                 ],
               ),
               content: SizedBox(
-                width: 350,
+                width: 500,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_currentStep == 0) ...[
-                      const Text('Seite 1: Kategorie wählen (Platzhalter)'),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: selectedCategory,
-                        items: categories.map((cat) => DropdownMenuItem(
-                          value: cat,
-                          child: Text(cat),
-                        )).toList(),
-                        onChanged: (value) {
-                          setDialogState(() {
-                            selectedCategory = value!;
-                            showCustomCategory = value == categories.last;
-                          });
-                        },
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        ),
+                    Text(
+                      'Erstelle ein neues Projekt für deine Dokumente und den Chatbot.',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 20),
+                    
+                    // Projektname
+                    Text(
+                      'Projektname',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    SizedBox(height: 8),
+                    TextFormField(
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        hintText: 'z.B. "Master Wirtschaftsinformatik", "Fakultät WiWi"',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.folder_outlined),
                       ),
-                      if (showCustomCategory) ...[
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: customCategoryController,
-                          decoration: const InputDecoration(
-                            labelText: 'Eigene Kategorie',
-                            border: OutlineInputBorder(),
-                          ),
+                      enabled: !_isCreating,
+                    ),
+                    SizedBox(height: 20),
+                    
+                    // Chatbot-Ziele
+                    Row(
+                      children: [
+                        Text(
+                          'Projekt-Notizen für den Chatbot',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        SizedBox(width: 8),
+                        Tooltip(
+                          message: 'Hier kannst du wichtige Hinweise, Ziele oder Kontext für dieses Projekt eintragen. Diese Infos benötigt der Chatbot um die bestmögliche Antwort zu geben.',
+                          child: Icon(Icons.info_outline, size: 18, color: Colors.grey[600]),
                         ),
                       ],
-                    ] else if (_currentStep == 1) ...[
-                      const Text('Seite 2: Projektnamen eingeben (Platzhalter)'),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          hintText: 'z.B. "Bachelorarbeit 2024"',
-                          border: OutlineInputBorder(),
-                        ),
+                    ),
+                    SizedBox(height: 12),
+                    TextFormField(
+                      controller: goalsController,
+                      minLines: 2,
+                      maxLines: 6,
+                      decoration: InputDecoration(
+                        hintText: 'z.B. "Bitte beachte, dass ich im 3. Semester bin und mich besonders für Wahlpflichtmodule interessiere."',
+                        border: OutlineInputBorder(),
                       ),
-                    ] else if (_currentStep == 2) ...[
-                      const Text('Seite 3: Zusammenfassung (Platzhalter)'),
-                      const SizedBox(height: 16),
-                      Text('Kategorie: ' + (showCustomCategory ? customCategoryController.text : selectedCategory)),
-                      Text('Projektname: ' + nameController.text),
-                    ],
+                      enabled: !_isCreating,
+                    ),
                   ],
                 ),
               ),
               actions: [
-                if (_currentStep > 0)
-                  TextButton(
-                    onPressed: () {
+                TextButton(
+                  onPressed: _isCreating ? null : () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                  child: Text('Abbrechen'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isCreating ? null : () async {
+                    final name = nameController.text.trim();
+                    final goals = goalsController.text.trim();
+                    
+                    if (name.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Bitte einen Projektnamen eingeben'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                      return;
+                    }
+                    
+                                         if (goals.isEmpty) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(
+                           content: Text('Bitte die Projekt-Notizen eingeben'),
+                           backgroundColor: Colors.red,
+                         ),
+                       );
+                       return;
+                     }
+                    
+                    setDialogState(() {
+                      _isCreating = true;
+                    });
+                    
+                                         try {
+                       await widget.onProjectCreated(name, goals);
+                       Navigator.of(context).pop(); // Dialog
+                       Navigator.of(context).pop(); // Seite
+                       
+                       // Projekt direkt öffnen
+                       Navigator.of(context).pushNamed('/projectView', arguments: {'name': name});
+                     } catch (e) {
                       setDialogState(() {
-                        _currentStep--;
+                        _isCreating = false;
                       });
-                    },
-                    child: const Text('Zurück'),
-                  ),
-                if (_currentStep < 2)
-                  ElevatedButton(
-                    onPressed: () {
-                      setDialogState(() {
-                        _currentStep++;
-                      });
-                    },
-                    child: const Text('Weiter'),
-                  ),
-                if (_currentStep == 2)
-                  ElevatedButton(
-                    onPressed: () async {
-                      final name = nameController.text.trim();
-                      String category = showCustomCategory ? customCategoryController.text.trim() : selectedCategory;
-                      if (name.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bitte einen Projektnamen eingeben'), backgroundColor: Colors.red),
-                        );
-                        return;
-                      }
-                      if (showCustomCategory && category.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bitte eine eigene Kategorie eingeben'), backgroundColor: Colors.red),
-                        );
-                        return;
-                      }
-                      await widget.onProjectCreated('$category - $name');
-                      Navigator.of(context).pop(); // Dialog
-                      Navigator.of(context).pop(); // Seite
-                    },
-                    child: const Text('Erstellen'),
-                  ),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Fehler beim Erstellen: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  icon: _isCreating 
+                    ? SizedBox(
+                        width: 16, 
+                        height: 16, 
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                      )
+                    : Icon(Icons.add),
+                  label: Text(_isCreating ? 'Erstelle...' : 'Projekt erstellen'),
+                ),
               ],
             );
           },
