@@ -3,7 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_uni_bot/Config/app_config.dart';
 import 'Support/firebase_options.dart';
 import 'Screens/project_list_screen.dart';
-import 'Screens/file_screen.dart';
 import 'Screens/server_unavailable_screen.dart';
 import 'package:http/http.dart' as http;
 import 'Screens/project_management_screen.dart';

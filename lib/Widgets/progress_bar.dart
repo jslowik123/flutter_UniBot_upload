@@ -4,12 +4,14 @@ import 'dart:convert';
 class ProgressBar extends StatelessWidget {
   final String projectAssessment;
   final VoidCallback? onDetailsPressed;
+  final bool isLoading;
 
   const ProgressBar({
-    Key? key,
+    super.key,
     required this.projectAssessment,
     this.onDetailsPressed,
-  }) : super(key: key);
+    this.isLoading = false,
+  });
 
   // Methode zum Extrahieren des Confidence-Werts
   double _extractConfidenceFromAssessment() {
@@ -27,7 +29,7 @@ class ProgressBar extends StatelessWidget {
         if (assessmentData.containsKey('confidence')) {
           final confidence = assessmentData['confidence'];
           if (confidence is num) {
-            return (confidence as num).toDouble().clamp(0.0, 100.0);
+            return (confidence).toDouble().clamp(0.0, 100.0);
           }
         }
         
@@ -36,7 +38,7 @@ class ProgressBar extends StatelessWidget {
           if (assessmentData.containsKey(key)) {
             final value = assessmentData[key];
             if (value is num) {
-              return (value as num).toDouble().clamp(0.0, 100.0);
+              return (value).toDouble().clamp(0.0, 100.0);
             }
           }
         }
@@ -81,19 +83,32 @@ class ProgressBar extends StatelessWidget {
     
     Color progressColor;
     String confidenceText;
+    String statusText;
     
-    if (confidence >= 80) {
+    if (isLoading) {
+      progressColor = Colors.blue;
+      confidenceText = 'Wird geladen...';
+      statusText = 'Assessment wird erstellt';
+    } else if (projectAssessment.isEmpty) {
+      progressColor = Colors.grey;
+      confidenceText = 'Noch nicht verfügbar';
+      statusText = 'Fügen Sie Dokumente hinzu, um ein Assessment zu erhalten';
+    } else if (confidence >= 80) {
       progressColor = Colors.green;
       confidenceText = 'Hoch';
+      statusText = 'Vollständigkeit: $confidenceText';
     } else if (confidence >= 60) {
       progressColor = Colors.orange;
       confidenceText = 'Mittel';
+      statusText = 'Vollständigkeit: $confidenceText';
     } else if (confidence >= 30) {
       progressColor = Colors.deepOrange;
       confidenceText = 'Niedrig';
+      statusText = 'Vollständigkeit: $confidenceText';
     } else {
       progressColor = Colors.red;
       confidenceText = 'Sehr niedrig';
+      statusText = 'Vollständigkeit: $confidenceText';
     }
     
     return Card(
@@ -109,23 +124,33 @@ class ProgressBar extends StatelessWidget {
                 Icon(Icons.trending_up, color: progressColor),
                 SizedBox(width: 8),
                 Text(
-                  'Vollsändigkeit des Chatbots',
+                  'Vollständigkeit des Chatbots',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Spacer(),
-                Text(
-                  '${confidence.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: progressColor,
+                if (isLoading)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                    ),
+                  )
+                else
+                  Text(
+                    projectAssessment.isEmpty ? '-' : '${confidence.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: progressColor,
+                    ),
                   ),
-                ),
               ],
             ),
             SizedBox(height: 12),
             LinearProgressIndicator(
-              value: progressValue,
+              value: isLoading ? null : (projectAssessment.isEmpty ? 0.0 : progressValue),
               backgroundColor: Colors.grey[300],
               valueColor: AlwaysStoppedAnimation<Color>(progressColor),
               minHeight: 8,
@@ -134,11 +159,13 @@ class ProgressBar extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Vollsändigkeit: $confidenceText',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
                   ),
                 ),
               ],

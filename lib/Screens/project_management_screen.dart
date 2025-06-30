@@ -8,7 +8,7 @@ import '../Widgets/project_overview.dart';
 import 'chatbot_test_screen.dart';
 
 class ProjectManagementScreen extends StatefulWidget {
-  const ProjectManagementScreen({Key? key}) : super(key: key);
+  const ProjectManagementScreen({super.key});
 
   @override
   State<ProjectManagementScreen> createState() => _ProjectManagementScreenState();

@@ -18,7 +18,7 @@ class ProjectOverview extends StatelessWidget {
   final VoidCallback? onRefreshKnowledge;
   final VoidCallback? onNavigateToChatbot;
   const ProjectOverview({
-    Key? key,
+    super.key,
     required this.projectInfoController,
     required this.initialProjectInfo,
     required this.isSavingProjectInfo,
@@ -31,7 +31,7 @@ class ProjectOverview extends StatelessWidget {
     required this.isLoadingKnowledge,
     this.onRefreshKnowledge,
     this.onNavigateToChatbot,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,12 +50,12 @@ class ProjectOverview extends StatelessWidget {
                 onSave: onSaveProjectInfo,
               ),
               
-              // Confidence Progress Bar (nur anzeigen wenn Assessment vorhanden)
-              if (projectAssessment.isNotEmpty && !isLoadingAssessment)
-                ProgressBar(
-                  projectAssessment: projectAssessment,
-                  onDetailsPressed: onShowAssessmentDialog,
-                ),
+              // Confidence Progress Bar (immer anzeigen)
+              ProgressBar(
+                projectAssessment: projectAssessment,
+                onDetailsPressed: onShowAssessmentDialog,
+                isLoading: isLoadingAssessment,
+              ),
               
               // Schön formatierte Assessment Card
               ProjectAssessmentCard(

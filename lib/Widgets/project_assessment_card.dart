@@ -7,11 +7,11 @@ class ProjectAssessmentCard extends StatelessWidget {
   final VoidCallback? onRefresh;
 
   const ProjectAssessmentCard({
-    Key? key,
+    super.key,
     required this.projectAssessment,
     required this.isLoadingAssessment,
     this.onRefresh,
-  }) : super(key: key);
+  });
 
   // Methode zur Formatierung des Assessment-Textes
   String _formatAssessmentText(String text) {

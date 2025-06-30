@@ -112,7 +112,7 @@ class _NewFileState extends State<NewFile> {
           // Textfeld erscheint nur wenn eine Datei ausgewählt wurde
           if (widget.filePicked) ...[
             const SizedBox(height: 16),
-            Container(
+            SizedBox(
               width: double.infinity,
               child: TextField(
                 controller: _textController,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class NewProjectScreen extends StatefulWidget {
   final Future<void> Function(String, String) onProjectCreated;
-  const NewProjectScreen({Key? key, required this.onProjectCreated}) : super(key: key);
+  const NewProjectScreen({super.key, required this.onProjectCreated});
 
   @override
   State<NewProjectScreen> createState() => _NewProjectScreenState();
@@ -96,7 +96,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                       minLines: 2,
                       maxLines: 6,
                       decoration: InputDecoration(
-                        hintText: 'z.B. "Bitte beachte, dass ich im 3. Semester bin und mich besonders für Wahlpflichtmodule interessiere."',
+                        hintText: 'z.B. "Das ist der Chatbot für den Bachelor und Master in Informatik"',
                         border: OutlineInputBorder(),
                       ),
                       enabled: !_isCreating,

@@ -7,12 +7,12 @@ class ProjectNotesCard extends StatelessWidget {
   final VoidCallback? onSave;
 
   const ProjectNotesCard({
-    Key? key,
+    super.key,
     required this.controller,
     required this.initialProjectInfo,
     required this.isSavingProjectInfo,
     this.onSave,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

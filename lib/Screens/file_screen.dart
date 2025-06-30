@@ -5,8 +5,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import '/Widgets/file_tile.dart';
 import '/Widgets/new_file.dart';
 import '/Services/file_service.dart';
-import '/Widgets/help_dialog.dart';
-import '/Widgets/help_content.dart';
 import '/Services/snackbar_service.dart';
 import '../models/processing_status.dart';
 import '../widgets/processing_status_tile.dart';
