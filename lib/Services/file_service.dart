@@ -93,6 +93,7 @@ class FileService {
     String projectName,
     String fileName,
     String filePath,
+    String hasTablesOrGraphics,
   ) async {
     try {
       Map<String, dynamic> data = {
@@ -102,6 +103,7 @@ class FileService {
         'processing': true,
         'progress': 0,
         'status': 'Warte auf Verarbeitung',
+        'hasTablesOrGraphics': hasTablesOrGraphics,
       };
       final newRef = _db.child(projectName).push();
       await newRef.set(data);
@@ -116,6 +118,7 @@ class FileService {
     String projectName,
     String fileName,
     String filePath,
+    bool hasTablesOrGraphics,
     Uint8List? fileBytes,
   ) async {
     try {
@@ -132,7 +135,8 @@ class FileService {
             contentType: 'application/pdf',
             customMetadata: {
               'project': projectName,
-              'uploadDate': DateTime.now().toIso8601String(),
+              'uploadDate': DateTime.now().toIso8601String(), 
+              'hasTablesOrGraphics': hasTablesOrGraphics.toString(),
             },
           ),
         );
@@ -188,6 +192,8 @@ class FileService {
     String fileID,
     String additionalInfo,
     List<String> taskIDs,
+    bool hasTablesOrGraphics,
+    String? pageNumbers,
   ) async {
     try {
       // 1. Zuerst Datei zu Firebase Storage hochladen
@@ -197,6 +203,7 @@ class FileService {
           projectName,
           fileName,
           filePath,
+          hasTablesOrGraphics,
           kIsWeb ? fileBytes : null,
         );
         
@@ -218,7 +225,22 @@ class FileService {
       request.fields['namespace'] = projectName;
       request.fields['fileID'] = fileID;
       request.fields['additionalInfo'] = additionalInfo;
-      
+      request.fields['hasTablesOrGraphics'] = hasTablesOrGraphics.toString();
+      if (pageNumbers != null && pageNumbers.isNotEmpty) {
+        // Parse die Seitennummern und sende als kommagetrennte String-Liste
+        debugPrint('Original pageNumbers: "$pageNumbers"');
+        final pageList = pageNumbers
+            .split(',')
+            .map((page) => page.trim())
+            .where((page) => page.isNotEmpty)
+            .where((page) => int.tryParse(page) != null) // Validiere, dass es eine Zahl ist
+            .toList(); // Behalte als String-Liste
+        final cleanedPageNumbers = pageList.join(',');
+        debugPrint('Cleaned pageNumbers: "$cleanedPageNumbers"');
+        request.fields['numberPages'] = cleanedPageNumbers;
+      } else {
+        debugPrint('pageNumbers is null or empty: "$pageNumbers"');
+      }
 
       if (kIsWeb) {
         request.files.add(
@@ -372,12 +394,14 @@ class FileService {
     required String fileName,
     required String projectName,
     required String additionalInfo,
+    bool hasTablesOrGraphics = false,
+    String? pageNumbers,
   }) async {
     String? fileID;
     
     try {
       // 1. Upload zu Firebase Database
-      fileID = await uploadToFirebase(projectName, fileName, filePath);
+      fileID = await uploadToFirebase(projectName, fileName, filePath, hasTablesOrGraphics.toString());
       
       // 2. Task starten (beinhaltet Storage Upload und API Call)
       final response = await startTask(
@@ -388,17 +412,30 @@ class FileService {
         fileID,
         additionalInfo,
         [],
+        hasTablesOrGraphics,
+        pageNumbers,
       );
 
       if (response['status'] != 'success') {
         throw Exception(response['message'] ?? 'Unbekannter Fehler');
       }
 
-      // 3. Beschreibung speichern falls vorhanden
+      // 3. Beschreibung und Seitennummern speichern falls vorhanden
+      final updates = <String, dynamic>{};
       if (additionalInfo.isNotEmpty) {
-        await _db.child('$projectName/$fileID').update({
-          'additional_info': additionalInfo,
-        });
+        updates['additional_info'] = additionalInfo;
+      }
+      if (pageNumbers != null && pageNumbers.isNotEmpty) {
+        final pageList = pageNumbers
+            .split(',')
+            .map((page) => page.trim())
+            .where((page) => page.isNotEmpty)
+            .where((page) => int.tryParse(page) != null)
+            .toList();
+        updates['pageNumbers'] = pageList;
+      }
+      if (updates.isNotEmpty) {
+        await _db.child('$projectName/$fileID').update(updates);
       }
 
       // 4. ProcessingStatus Objekt zurückgeben

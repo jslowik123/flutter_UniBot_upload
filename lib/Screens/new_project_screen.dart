@@ -85,7 +85,7 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                         ),
                         SizedBox(width: 8),
                         Tooltip(
-                          message: 'Hier kannst du wichtige Hinweise, Ziele oder Kontext für dieses Projekt eintragen. Diese Infos benötigt der Chatbot um die bestmögliche Antwort zu geben.',
+                          message: 'WICHTIG: Diese Notizen sind essentiell für die Vollständigkeits-Bewertung! Ohne diese Angaben kann das System nicht einschätzen, welche Dokumente für dein Projekt relevant sind. Trage hier wichtige Hinweise, Ziele oder Kontext ein.',
                           child: Icon(Icons.info_outline, size: 18, color: Colors.grey[600]),
                         ),
                       ],

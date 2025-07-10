@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class NewFile extends StatefulWidget {
   final String? fileName;
   final Future<void> Function() pickFileFunc;
-  final Function(String) confirmSelectionFunc;
+  final Function(String, {bool? hasTablesOrGraphics, String? pageNumbers}) confirmSelectionFunc;
   final bool filePicked;
 
   const NewFile({
@@ -20,26 +20,40 @@ class NewFile extends StatefulWidget {
 
 class _NewFileState extends State<NewFile> {
   late TextEditingController _textController;
+  late TextEditingController _pageNumbersController;
+  bool _hasTablesOrGraphics = false;
 
   @override
   void initState() {
     super.initState();
     _textController = TextEditingController();
+    _pageNumbersController = TextEditingController();
   }
 
   @override
   void dispose() {
     _textController.dispose();
+    _pageNumbersController.dispose();
     super.dispose();
   }
 
   void _handleConfirmSelection() {
     // Text speichern und an die Callback-Funktion übergeben
     final text = _textController.text;
-    widget.confirmSelectionFunc(text);
+    final pageNumbers = _hasTablesOrGraphics ? _pageNumbersController.text : null;
+    widget.confirmSelectionFunc(
+      text, 
+      hasTablesOrGraphics: _hasTablesOrGraphics,
+      pageNumbers: pageNumbers,
+    );
     
-    // Textfeld nach dem Bestätigen clearen
+    // Textfelder nach dem Bestätigen clearen
     _textController.clear();
+    _pageNumbersController.clear();
+    // Checkbox zurücksetzen
+    setState(() {
+      _hasTablesOrGraphics = false;
+    });
   }
 
   @override
@@ -109,8 +123,70 @@ class _NewFileState extends State<NewFile> {
               textAlign: TextAlign.center,
             ),
           ),
-          // Textfeld erscheint nur wenn eine Datei ausgewählt wurde
+          // Checkbox erscheint nur wenn eine Datei ausgewählt wurde
           if (widget.filePicked) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _hasTablesOrGraphics,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            _hasTablesOrGraphics = value ?? false;
+                            if (!_hasTablesOrGraphics) {
+                              _pageNumbersController.clear();
+                            }
+                          });
+                        },
+                        activeColor: Colors.blue,
+                      ),
+                      Expanded(
+                        child: Text(
+                          'Dokument enthält Tabellen, Grafiken oder Diagramme',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.blue[800],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Seitennummern-Eingabefeld erscheint nur wenn Checkbox aktiviert ist
+                  if (_hasTablesOrGraphics) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pageNumbersController,
+                      decoration: InputDecoration(
+                        labelText: 'Seitennummern (z.B. 1,2,3,4)',
+                        hintText: 'Kommagetrennte Seitennummern eingeben...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        fillColor: Colors.white,
+                        filled: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,

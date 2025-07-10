@@ -149,8 +149,8 @@ class _FileScreenState extends State<FileScreen> {
     }
   }
 
-  Future<void> _confirmSelection(String description) async {
-    print('[_confirmSelection] _filePath=$_filePath, _fileName=$_fileName, _projectName=$_projectName');
+  Future<void> _confirmSelection(String description, {bool? hasTablesOrGraphics, String? pageNumbers}) async {
+    print('[_confirmSelection] _filePath=$_filePath, _fileName=$_fileName, _projectName=$_projectName, hasTablesOrGraphics=$hasTablesOrGraphics, pageNumbers=$pageNumbers');
     if (_filePath == null) {
       _showErrorSnackBar('Bitte wählen Sie zuerst eine Datei aus');
       return;
@@ -164,6 +164,8 @@ class _FileScreenState extends State<FileScreen> {
         fileName: _fileName!,
         projectName: _projectName!,
         additionalInfo: description,
+        hasTablesOrGraphics: hasTablesOrGraphics ?? false,
+        pageNumbers: pageNumbers,
       );
 
       setState(() {
