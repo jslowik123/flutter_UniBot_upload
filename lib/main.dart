@@ -65,7 +65,9 @@ class _MyAppState extends State<MyApp> {
           }
         },
       ),
-      routes: {'/projectView': (context) => ProjectManagementScreen()},
+      routes: {
+        '/projectView': (context) => ProjectManagementScreen(),
+      },
     );
   }
 }

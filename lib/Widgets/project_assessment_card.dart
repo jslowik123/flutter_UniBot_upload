@@ -38,60 +38,47 @@ class ProjectAssessmentCard extends StatelessWidget {
         final jsonString = projectAssessment.substring(jsonStart, jsonEnd);
         final Map<String, dynamic> assessmentData = json.decode(jsonString);
         
-        // Wichtige Felder extrahieren - nur die gewünschten Felder
-        final importantFields = {
+        // Reihenfolge und Labels der Felder (ohne wissensstand)
+        final fieldOrder = [
+          'vorhandene_dokumente',
+          'fehlende_dokumente',
+          'tipps',
+        ];
+        final fieldLabels = {
           'vorhandene_dokumente': 'Vorhandene Dokumente',
-          'fehlende_dokumente': 'Fehlende Dokumente', 
+          'fehlende_dokumente': 'Fehlende Dokumente',
           'tipps': 'Tipps',
         };
         
-        // Alle anderen Felder ausschließen - nur die gewünschten Felder anzeigen
-        final allowedFields = {'vorhandene_dokumente', 'fehlende_dokumente', 'tipps'};
-        
-        for (final entry in assessmentData.entries) {
-          // Nur die erlaubten Felder anzeigen
-          if (!allowedFields.contains(entry.key.toLowerCase())) {
-            continue;
+        for (final field in fieldOrder) {
+          if (assessmentData.containsKey(field)) {
+            final value = assessmentData[field];
+            String displayValue;
+            if (value is List) {
+              displayValue = value.map((e) => '• $e').join('\n');
+            } else {
+              displayValue = value.toString();
+            }
+            keyValues.add({
+              'key': fieldLabels[field] ?? field,
+              'value': displayValue,
+            });
           }
-          
-          String displayKey = importantFields[entry.key.toLowerCase()] ?? entry.key;
-          String displayValue = entry.value.toString();
-          
-          keyValues.add({
-            'key': displayKey,
-            'value': displayValue,
-          });
         }
       }
     } catch (e) {
       // Fallback: Suche nach Pattern wie "Key: Value"
-      final RegExp keyValueRegex = RegExp(r'([A-Za-z\s]+):\s*([^\n]+)', multiLine: true);
+      final RegExp keyValueRegex = RegExp(r'([A-Za-z_äöüß\s]+):\s*([^\n]+)', multiLine: true);
       final matches = keyValueRegex.allMatches(projectAssessment);
-      
+      final allowedKeys = ['vorhandene_dokumente', 'fehlende_dokumente', 'tipps'];
       for (final match in matches) {
         final key = match.group(1)?.trim() ?? '';
         final value = match.group(2)?.trim() ?? '';
-        
-        // Nur die gewünschten Felder anzeigen
-        final allowedKeys = ['vorhandene_dokumente', 'fehlende_dokumente', 'tipps'];
-        bool isAllowed = false;
-        
         for (final allowedKey in allowedKeys) {
-          if (key.toLowerCase().contains(allowedKey.toLowerCase())) {
-            isAllowed = true;
+          if (key.toLowerCase().contains(allowedKey)) {
+            keyValues.add({'key': key, 'value': value});
             break;
           }
-        }
-        
-        if (!isAllowed) {
-          continue;
-        }
-        
-        if (key.isNotEmpty && value.isNotEmpty) {
-          keyValues.add({
-            'key': key,
-            'value': value,
-          });
         }
       }
     }
@@ -101,6 +88,7 @@ class ProjectAssessmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: ProjectAssessmentCard build - assessment: "${projectAssessment.length} chars", isLoading: $isLoadingAssessment');
     final keyValues = _extractAssessmentKeyValues();
     final hasStructuredData = keyValues.isNotEmpty;
     

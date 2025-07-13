@@ -169,6 +169,7 @@ class ProjectListScreenState extends State<ProjectListScreen> {
         title: const Text('Projekte'),
         centerTitle: true,
         actions: [
+        
           IconButton(
             onPressed: () => HelpDialog.show(context, ProjectHelpContent.pages),
             icon: const Icon(Icons.help_outline),

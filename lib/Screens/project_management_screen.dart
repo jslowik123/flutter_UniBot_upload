@@ -5,7 +5,6 @@ import '/Services/snackbar_service.dart';
 import '../Widgets/help_dialog.dart';
 import '../Widgets/help_content.dart';
 import '../Widgets/project_overview.dart';
-import 'chatbot_test_screen.dart';
 
 class ProjectManagementScreen extends StatefulWidget {
   const ProjectManagementScreen({super.key});
@@ -19,6 +18,7 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
   String? _projectName;
   bool _isInitialized = false;
   int _selectedIndex = 0;
+  bool _hasShownServerError = false;
 
   // Notizen-Logik
   final ProjectService _projectService = ProjectService();
@@ -34,15 +34,27 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
   String _projectKnowledge = '';
   bool _isLoadingKnowledge = false;
 
+  // Beispielfragen-Logik
+  Map<String, String> _exampleQuestions = {};
+  bool _isLoadingExampleQuestions = false;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
       _routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _projectName = _routeArgs?['name'];
-      _loadProjectInfo();
-      _loadProjectAssessment();
-      _loadProjectKnowledge();
+      print('DEBUG: Project name from route: $_projectName');
+      print('DEBUG: Route args: $_routeArgs');
+      
+      // Alle Felder parallel laden für bessere Performance
+      if (_projectName != null) {
+        _loadProjectInfo();
+        _loadProjectAssessment();
+        _loadProjectKnowledge();
+        _loadExampleQuestions();
+      }
+      
       _projectInfoController.addListener(_onProjectInfoChanged);
       _isInitialized = true;
     }
@@ -68,6 +80,7 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     }
     try {
       final info = await _projectService.getProjectInfo(_projectName!);
+      print('DEBUG: ProjectInfo loaded: "${info.length} chars - ${info.isEmpty ? 'EMPTY' : info.substring(0, info.length > 50 ? 50 : info.length)}..."');
       _projectInfoController.text = info;
       _initialProjectInfo = info;
       setState(() {});
@@ -75,6 +88,12 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
       _projectInfoController.text = '';
       _initialProjectInfo = '';
       setState(() {});
+      // Stille Fehlerbehandlung - andere Felder sollen trotzdem laden
+      // Informiere über Server-Probleme nur einmal
+      if (mounted && !_hasShownServerError) {
+        _hasShownServerError = true;
+        SnackbarService.showError(context, 'Verbindung zum Server nicht möglich');
+      }
     }
   }
 
@@ -87,11 +106,13 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     setState(() => _isLoadingAssessment = true);
     try {
       final assessment = await _projectService.getProjectAssessmentData(_projectName!);
+      print('DEBUG: ProjectAssessment loaded: "${assessment.length} chars - ${assessment.isEmpty ? 'EMPTY' : assessment.substring(0, assessment.length > 50 ? 50 : assessment.length)}..."');
       _projectAssessment = assessment;
       setState(() {});
     } catch (e) {
       _projectAssessment = '';
       setState(() {});
+      // Stille Fehlerbehandlung - andere Felder sollen trotzdem laden
     } finally {
       setState(() => _isLoadingAssessment = false);
     }
@@ -106,13 +127,48 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     setState(() => _isLoadingKnowledge = true);
     try {
       final knowledge = await _projectService.getProjectKnowledge(_projectName!);
+      print('DEBUG: ProjectKnowledge loaded: "${knowledge.length} chars - ${knowledge.isEmpty ? 'EMPTY' : knowledge.substring(0, knowledge.length > 50 ? 50 : knowledge.length)}..."');
       _projectKnowledge = knowledge;
       setState(() {});
     } catch (e) {
       _projectKnowledge = '';
       setState(() {});
+      // Stille Fehlerbehandlung - andere Felder sollen trotzdem laden
     } finally {
       setState(() => _isLoadingKnowledge = false);
+    }
+  }
+
+  Future<void> _loadExampleQuestions() async {
+    if (_projectName == null) {
+      _exampleQuestions = {};
+      setState(() {});
+      return;
+    }
+    setState(() => _isLoadingExampleQuestions = true);
+          try {
+        final questions = await _projectService.getExampleQuestions(_projectName!);
+        print('DEBUG: ExampleQuestions loaded: $questions');
+        
+        // Prüfe den Status der Antwort
+        if (questions.containsKey('status')) {
+          if (questions['status'] == 'generating') {
+            _exampleQuestions = {'status': 'generating', 'message': 'Fragen werden generiert'};
+          } else {
+            // Andere Status oder Fehler
+            _exampleQuestions = {};
+          }
+        } else {
+          // Normale Fragen erhalten
+          _exampleQuestions = questions;
+        }
+        setState(() {});
+      } catch (e) {
+      _exampleQuestions = {};
+      setState(() {});
+      // Stille Fehlerbehandlung - andere Felder sollen trotzdem laden
+    } finally {
+      setState(() => _isLoadingExampleQuestions = false);
     }
   }
 
@@ -146,6 +202,38 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
       _projectService.clearProjectCache(_projectName!);
     }
     await _loadProjectKnowledge();
+  }
+
+  Future<void> _refreshExampleQuestions() async {
+    if (_projectName == null) return;
+    
+    // Cache für Beispielfragen leeren um frische Daten zu bekommen
+    _projectService.clearExampleQuestionsCache(_projectName!);
+    
+    setState(() => _isLoadingExampleQuestions = true);
+    try {
+      // Lade die Beispielfragen neu
+      final questions = await _projectService.getExampleQuestions(_projectName!);
+      
+      // Prüfe den Status der Fragen
+      if (questions.containsKey('status') && questions['status'] == 'generating') {
+        _exampleQuestions = {'status': 'generating', 'message': 'Fragen werden generiert'};
+        SnackbarService.showSuccess(context, 'Beispielfragen werden noch generiert...');
+      } else if (questions.isNotEmpty) {
+        _exampleQuestions = questions;
+        SnackbarService.showSuccess(context, 'Beispielfragen aktualisiert');
+      } else {
+        _exampleQuestions = {};
+        SnackbarService.showSuccess(context, 'Beispielfragen aktualisiert');
+      }
+      setState(() {});
+    } catch (e) {
+      _exampleQuestions = {};
+      setState(() {});
+      SnackbarService.showError(context, 'Fehler beim Aktualisieren der Beispielfragen');
+    } finally {
+      setState(() => _isLoadingExampleQuestions = false);
+    }
   }
 
   void _showAssessmentDialog() {
@@ -197,15 +285,15 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     HelpDialog.show(context, helpPages);
   }
 
-  void _navigateToChatbot() {
-    setState(() {
-      _selectedIndex = 2; // Index für Chatbot Test Tab
-    });
-  }
-
   Widget _getSelectedScreen() {
     switch (_selectedIndex) {
       case 0:
+        print('DEBUG: Building ProjectOverview with:');
+        print('  - projectInfoController text: "${_projectInfoController.text}"');
+        print('  - initialProjectInfo: "$_initialProjectInfo"');
+        print('  - projectAssessment: "${_projectAssessment.length} chars"');
+        print('  - projectKnowledge: "${_projectKnowledge.length} chars"');
+        print('  - exampleQuestions: $_exampleQuestions');
         return ProjectOverview(
           projectInfoController: _projectInfoController,
           initialProjectInfo: _initialProjectInfo,
@@ -218,12 +306,14 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
           projectKnowledge: _projectKnowledge,
           isLoadingKnowledge: _isLoadingKnowledge,
           onRefreshKnowledge: _refreshKnowledge,
-          onNavigateToChatbot: _navigateToChatbot,
+          // onNavigateToChatbot entfernt
+          exampleQuestions: _exampleQuestions,
+          isLoadingExampleQuestions: _isLoadingExampleQuestions,
+          onRefreshExampleQuestions: _refreshExampleQuestions,
         );
       case 1:
         return FileScreen();
-      case 2:
-        return ChatbotTestScreen();
+      // case 2 entfernt (ChatbotTestScreen)
       default:
         return Center(child: Text('Unbekannter Bereich'));
     }
@@ -263,11 +353,7 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
                 selectedIcon: Icon(Icons.insert_drive_file),
                 label: Text('Dateien'),
               ),
-              NavigationRailDestination(
-                icon: Icon(Icons.chat_outlined),
-                selectedIcon: Icon(Icons.chat),
-                label: Text('Chatbot Test'),
-              ),  
+              // Chatbot-Test Tab entfernt
             ],
           ),
           const VerticalDivider(thickness: 1, width: 1),

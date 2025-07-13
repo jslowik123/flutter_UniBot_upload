@@ -16,6 +16,7 @@ class ProjectNotesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: ProjectNotesCard build - controller.text: "${controller.text}", initialProjectInfo: "$initialProjectInfo"');
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 0),
       elevation: 2,

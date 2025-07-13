@@ -6,7 +6,7 @@ class ProjectKnowledgeCard extends StatelessWidget {
   final bool isLoadingKnowledge;
   final VoidCallback? onRefreshKnowledge;
   final String? projectAssessment;
-  final VoidCallback? onNavigateToChatbot;
+  // onNavigateToChatbot entfernt
   
   const ProjectKnowledgeCard({
     super.key, 
@@ -14,7 +14,7 @@ class ProjectKnowledgeCard extends StatelessWidget {
     required this.isLoadingKnowledge, 
     this.onRefreshKnowledge,
     this.projectAssessment,
-    this.onNavigateToChatbot,
+    // onNavigateToChatbot entfernt
   });
 
   String _extractWissensstand() {
@@ -46,6 +46,7 @@ class ProjectKnowledgeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('DEBUG: ProjectKnowledgeCard build - knowledge: "${projectKnowledge.length} chars", isLoading: $isLoadingKnowledge');
     final wissensstand = _extractWissensstand();
     
     return Card(
@@ -137,43 +138,19 @@ class ProjectKnowledgeCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                  
                   // Wissensstand als ListTile anzeigen (falls vorhanden)
                   if (wissensstand.isNotEmpty) ...[
                     if (projectKnowledge.isNotEmpty) SizedBox(height: 12),
-            
-            
-                      Text(
-                        wissensstand,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.4,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      
-                  ],
-                  
-                  // Chatbot-Button (falls Wissensbasis oder Wissensstand vorhanden)
-                  if ((projectKnowledge.isNotEmpty || wissensstand.isNotEmpty) && onNavigateToChatbot != null) ...[
-                    SizedBox(height: 16),
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: onNavigateToChatbot,
-                        icon: Icon(Icons.chat, size: 18),
-                        label: Text('Chatbot testen'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[600],
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          elevation: 2,
-                        ),
+                    Text(
+                      wissensstand,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: Colors.black87,
                       ),
                     ),
                   ],
+                  // Chatbot-Button entfernt
                 ],
               ),
           ],

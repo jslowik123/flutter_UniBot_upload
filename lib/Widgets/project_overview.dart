@@ -3,6 +3,7 @@ import 'project_notes_card.dart';
 import 'progress_bar.dart';
 import 'project_assessment_card.dart';
 import 'project_knowledge_card.dart';
+import 'project_example_questions_card.dart';
 
 class ProjectOverview extends StatelessWidget {
   final TextEditingController projectInfoController;
@@ -16,7 +17,10 @@ class ProjectOverview extends StatelessWidget {
   final String projectKnowledge;
   final bool isLoadingKnowledge;
   final VoidCallback? onRefreshKnowledge;
-  final VoidCallback? onNavigateToChatbot;
+  final Map<String, String> exampleQuestions;
+  final bool isLoadingExampleQuestions;
+  final VoidCallback? onRefreshExampleQuestions;
+
   const ProjectOverview({
     super.key,
     required this.projectInfoController,
@@ -30,7 +34,9 @@ class ProjectOverview extends StatelessWidget {
     required this.projectKnowledge,
     required this.isLoadingKnowledge,
     this.onRefreshKnowledge,
-    this.onNavigateToChatbot,
+    required this.exampleQuestions,
+    required this.isLoadingExampleQuestions,
+    this.onRefreshExampleQuestions,
   });
 
   @override
@@ -70,7 +76,13 @@ class ProjectOverview extends StatelessWidget {
                 isLoadingKnowledge: isLoadingKnowledge,
                 onRefreshKnowledge: onRefreshKnowledge,
                 projectAssessment: projectAssessment,
-                onNavigateToChatbot: onNavigateToChatbot,
+              ),
+
+              // Beispielfragen Card
+              ProjectExampleQuestionsCard(
+                exampleQuestions: exampleQuestions,
+                isLoadingQuestions: isLoadingExampleQuestions,
+                onRefresh: onRefreshExampleQuestions,
               ),
             ],
           ),

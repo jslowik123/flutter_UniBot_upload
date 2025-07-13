@@ -13,24 +13,29 @@ class ProjectService {
   final Map<String, String> _projectInfoCache = {};
   final Map<String, String> _projectAssessmentCache = {};
   final Map<String, String> _projectKnowledgeCache = {};
+  final Map<String, Map<String, String>> _exampleQuestionsCache = {};
 
   String getFormattedDate() {
     final DateTime now = DateTime.now();
     final DateFormat formatter = DateFormat('dd.MM.yyyy');
     return formatter.format(now);
   }
+
   Future<void> sendProjectAssessment(String projectName, String additionalInfo) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}/get_assessment_data');
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/trigger_assessment');
       final request = http.MultipartRequest('POST', uri)
-        ..fields['namespace'] = projectName
-        ..fields['additional_info'] = additionalInfo;
+        ..fields['namespace'] = projectName;
 
       final response = await request.send();
       final responseData = await response.stream.bytesToString();
       final jsonResponse = json.decode(responseData);
+      
+      if (response.statusCode != 200 || jsonResponse['status'] != 'success') {
+        throw Exception('Assessment-Trigger fehlgeschlagen: ${jsonResponse['message'] ?? response.statusCode}');
+      }
     } catch (e) {
-      throw Exception('Fehler beim Abrufen der Projektbeurteilung: $e');
+      throw Exception('Fehler beim Triggern der Projektbeurteilung: $e');
     }
   }
 
@@ -113,23 +118,33 @@ class ProjectService {
     if (_projectInfoCache.containsKey(projectName)) {
       return _projectInfoCache[projectName]!;
     }
-    final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/get_project_info?project_name=$projectName'),
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      final info = data['info'] ?? '';
-      final assessment = data['assessment'] ?? '';
-      final wissenstand = data['wissenstand'] ?? '';
+    
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/get_project_info?project_name=$projectName'),
+      );
       
-      // Alle drei Werte im Cache speichern
-      _projectInfoCache[projectName] = info;
-      _projectAssessmentCache[projectName] = assessment;
-      _projectKnowledgeCache[projectName] = wissenstand;
-      
-      return info;
-    } else {
-      throw Exception('Fehler beim Abrufen der Projektinfo');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('DEBUG: ProjectInfo API response: $data');
+        
+        // Handle different response formats
+        if (data['status'] == 'success') {
+          final info = data['data'] ?? '';
+          _projectInfoCache[projectName] = info;
+          return info;
+        } else if (data['status'] == 'not_found') {
+          // Keine Projektinfo vorhanden
+          _projectInfoCache[projectName] = '';
+          return '';
+        } else {
+          throw Exception('API Fehler: ${data['message'] ?? 'Unbekannter Fehler'}');
+        }
+      } else {
+        throw Exception('HTTP Fehler: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Abrufen der Projektinfo: $e');
     }
   }
 
@@ -138,9 +153,26 @@ class ProjectService {
       return _projectKnowledgeCache[projectName]!;
     }
     
-    // Falls noch nicht im Cache, hole alle Werte über getProjectInfo
-    await getProjectInfo(projectName);
-    return _projectKnowledgeCache[projectName] ?? '';
+    try {
+      final assessmentRef = FirebaseDatabase.instance.ref().child('files').child(projectName).child('assessment');
+      final snapshot = await assessmentRef.once();
+      
+      if (snapshot.snapshot.exists) {
+        final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
+        final knowledge = data?['wissensstand']?.toString() ?? '';
+        print('DEBUG: ProjectKnowledge loaded from Firebase: "${knowledge.length} chars"');
+        _projectKnowledgeCache[projectName] = knowledge;
+        return knowledge;
+      } else {
+        print('DEBUG: No assessment data found in Firebase for $projectName');
+        _projectKnowledgeCache[projectName] = '';
+        return '';
+      }
+    } catch (e) {
+      print('DEBUG: Error loading knowledge from Firebase: $e');
+      _projectKnowledgeCache[projectName] = '';
+      return '';
+    }
   }
 
   Future<String> getProjectAssessmentData(String projectName) async {
@@ -148,23 +180,115 @@ class ProjectService {
       return _projectAssessmentCache[projectName]!;
     }
     
-    // Falls noch nicht im Cache, hole beide Werte
-    await getProjectInfo(projectName);
-    return _projectAssessmentCache[projectName] ?? '';
+    try {
+      final assessmentRef = FirebaseDatabase.instance.ref().child('files').child(projectName).child('assessment');
+      final snapshot = await assessmentRef.once();
+      
+      if (snapshot.snapshot.exists) {
+        final raw = snapshot.snapshot.value;
+        Map<dynamic, dynamic>? data;
+        if (raw is String) {
+          // String (JSON-Text) -> Map
+          data = json.decode(raw);
+        } else if (raw is Map) {
+          data = raw;
+        } else {
+          data = null;
+        }
+        
+        if (data != null) {
+          // Gebe den JSON-String der Assessment-Daten zurück (inkl. aller Felder)
+          final jsonString = json.encode(data);
+          print('DEBUG: ProjectAssessment loaded from Firebase (JSON): "${jsonString.length} chars"');
+          _projectAssessmentCache[projectName] = jsonString;
+          return jsonString;
+        }
+      }
+      
+      print('DEBUG: No assessment data found in Firebase for $projectName');
+      _projectAssessmentCache[projectName] = '';
+      return '';
+    } catch (e) {
+      print('DEBUG: Error loading assessment from Firebase: $e');
+      _projectAssessmentCache[projectName] = '';
+      return '';
+    }
   }
 
   Future<void> setProjectInfo(String projectName, String info) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/set_project_info'),
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'project_name': projectName, 'info': info},
-    );
-    if (response.statusCode == 200) {
-      _projectInfoCache[projectName] = info;
-      // Assessment-Cache invalidieren, da sich die Projektinfo geändert hat
-      _projectAssessmentCache.remove(projectName);
-    } else {
-      throw Exception('Fehler beim Speichern der Projektinfo');
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}/set_project_info');
+      final request = http.MultipartRequest('POST', uri)
+        ..fields['project_name'] = projectName
+        ..fields['info'] = info;
+
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData);
+      
+      if (response.statusCode == 200 && jsonResponse['status'] == 'success') {
+        _projectInfoCache[projectName] = info;
+        // Assessment-Cache invalidieren, da sich die Projektinfo geändert hat
+        _projectAssessmentCache.remove(projectName);
+        _projectKnowledgeCache.remove(projectName);
+      } else {
+        throw Exception('API Fehler: ${jsonResponse['message'] ?? 'Unbekannter Fehler'}');
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Speichern der Projektinfo: $e');
+    }
+  }
+
+  Future<Map<String, String>> getExampleQuestions(String projectName) async {
+    if (_exampleQuestionsCache.containsKey(projectName)) {
+      return _exampleQuestionsCache[projectName]!;
+    }
+    
+    try {
+      final response = await http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/get_example_questions/$projectName'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('DEBUG: ExampleQuestions API response: $data');
+        
+        // Handle different status responses
+        if (data['status'] == 'success') {
+          final questions = <String, String>{};
+          final questionData = data['data'] as List<dynamic>?;
+          
+          if (questionData != null) {
+            // Konvertiere die Daten in das erwartete Format
+            for (int i = 0; i < questionData.length && i < 3; i++) {
+              final qa = questionData[i] as Map<String, dynamic>;
+              final question = qa['question']?.toString() ?? '';
+              final answer = qa['answer']?.toString() ?? '';
+              
+              if (question.isNotEmpty && answer.isNotEmpty) {
+                questions['question${i + 1}'] = question;
+                questions['answer${i + 1}'] = answer;
+              }
+            }
+          }
+          
+          _exampleQuestionsCache[projectName] = questions;
+          return questions;
+        } else if (data['status'] == 'generating') {
+          // Fragen werden gerade generiert
+          return {'status': 'generating', 'message': 'Fragen werden generiert'};
+        } else if (data['status'] == 'not_found') {
+          // Keine Fragen vorhanden
+          return {};
+        } else {
+          // Fehler
+          throw Exception('API Fehler: ${data['message'] ?? 'Unbekannter Fehler'}');
+        }
+      } else {
+        throw Exception('HTTP Fehler: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Fehler beim Abrufen der Beispielfragen: $e');
     }
   }
 
@@ -173,6 +297,12 @@ class ProjectService {
     _projectInfoCache.remove(projectName);
     _projectAssessmentCache.remove(projectName);
     _projectKnowledgeCache.remove(projectName);
+    _exampleQuestionsCache.remove(projectName);
+  }
+
+  // Methode zum Leeren nur des Beispielfragen-Caches
+  void clearExampleQuestionsCache(String projectName) {
+    _exampleQuestionsCache.remove(projectName);
   }
 
   // Methode zum Initialisieren des Caches für alle Projekte

@@ -169,8 +169,10 @@ class _NewFileState extends State<NewFile> {
                     TextField(
                       controller: _pageNumbersController,
                       decoration: InputDecoration(
-                        labelText: 'Seitennummern (z.B. 1,2,3,4)',
-                        hintText: 'Kommagetrennte Seitennummern eingeben...',
+                        labelText: 'Seitennummern mit Grafiken/Tabellen',
+                        hintText: 'z.B. 1,2,3,4 (nur Zahlen, getrennt durch Kommas)',
+                        helperText: 'Geben Sie die Seitennummern ein, auf denen sich Grafiken, Tabellen oder Diagramme befinden',
+                        helperMaxLines: 2,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -182,6 +184,7 @@ class _NewFileState extends State<NewFile> {
                         ),
                       ),
                       style: const TextStyle(fontSize: 14),
+                      keyboardType: TextInputType.number,
                     ),
                   ],
                 ],
