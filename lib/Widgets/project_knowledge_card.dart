@@ -46,7 +46,6 @@ class ProjectKnowledgeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: ProjectKnowledgeCard build - knowledge: "${projectKnowledge.length} chars", isLoading: $isLoadingKnowledge');
     final wissensstand = _extractWissensstand();
     
     return Card(

@@ -14,7 +14,6 @@ class ProjectExampleQuestionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: ProjectExampleQuestionsCard build - questions: $exampleQuestions, isLoading: $isLoadingQuestions');
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -96,13 +95,13 @@ class ProjectExampleQuestionsCard extends StatelessWidget {
                     child: Column(
                       children: [
                         CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.orange[700]!),
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green[700]!),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Fragen werden generiert...',
                           style: TextStyle(
-                            color: Colors.orange[600],
+                            color: Colors.green[700],
                             fontSize: 14,
                           ),
                         ),

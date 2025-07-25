@@ -252,7 +252,6 @@ class _FileScreenState extends State<FileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    print('[build] _projectName=\u001b[0m_projectName, _isLoading=\u001b[0m_isLoading, _importedFiles=\u001b[0m_importedFiles.length, _processingFiles=\u001b[0m_processingFiles.length');
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800),
@@ -279,12 +278,14 @@ class _FileScreenState extends State<FileScreen> {
                       projectName: _projectName!,
                     ),
                   ),
-                  ..._importedFiles.map(
-                    (file) => FileTile(
-                      file: file,
-                      deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
-                    ),
-                  ),
+                  ..._importedFiles
+                      .where((file) => file['name'] != null && file['name'].toString().trim().isNotEmpty)
+                      .map(
+                        (file) => FileTile(
+                          file: file,
+                          deleteFileFunc: () => _deleteFile(file['path']!, file['name']!),
+                        ),
+                      ),
                 ],
               ],
             ),

@@ -88,7 +88,6 @@ class ProjectAssessmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    print('DEBUG: ProjectAssessmentCard build - assessment: "${projectAssessment.length} chars", isLoading: $isLoadingAssessment');
     final keyValues = _extractAssessmentKeyValues();
     final hasStructuredData = keyValues.isNotEmpty;
     

@@ -44,8 +44,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     if (!_isInitialized) {
       _routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       _projectName = _routeArgs?['name'];
-      print('DEBUG: Project name from route: $_projectName');
-      print('DEBUG: Route args: $_routeArgs');
       
       // Alle Felder parallel laden für bessere Performance
       if (_projectName != null) {
@@ -80,7 +78,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     }
     try {
       final info = await _projectService.getProjectInfo(_projectName!);
-      print('DEBUG: ProjectInfo loaded: "${info.length} chars - ${info.isEmpty ? 'EMPTY' : info.substring(0, info.length > 50 ? 50 : info.length)}..."');
       _projectInfoController.text = info;
       _initialProjectInfo = info;
       setState(() {});
@@ -106,7 +103,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     setState(() => _isLoadingAssessment = true);
     try {
       final assessment = await _projectService.getProjectAssessmentData(_projectName!);
-      print('DEBUG: ProjectAssessment loaded: "${assessment.length} chars - ${assessment.isEmpty ? 'EMPTY' : assessment.substring(0, assessment.length > 50 ? 50 : assessment.length)}..."');
       _projectAssessment = assessment;
       setState(() {});
     } catch (e) {
@@ -127,7 +123,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     setState(() => _isLoadingKnowledge = true);
     try {
       final knowledge = await _projectService.getProjectKnowledge(_projectName!);
-      print('DEBUG: ProjectKnowledge loaded: "${knowledge.length} chars - ${knowledge.isEmpty ? 'EMPTY' : knowledge.substring(0, knowledge.length > 50 ? 50 : knowledge.length)}..."');
       _projectKnowledge = knowledge;
       setState(() {});
     } catch (e) {
@@ -148,7 +143,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
     setState(() => _isLoadingExampleQuestions = true);
           try {
         final questions = await _projectService.getExampleQuestions(_projectName!);
-        print('DEBUG: ExampleQuestions loaded: $questions');
         
         // Prüfe den Status der Antwort
         if (questions.containsKey('status')) {
@@ -288,12 +282,6 @@ class _ProjectManagementScreenState extends State<ProjectManagementScreen> {
   Widget _getSelectedScreen() {
     switch (_selectedIndex) {
       case 0:
-        print('DEBUG: Building ProjectOverview with:');
-        print('  - projectInfoController text: "${_projectInfoController.text}"');
-        print('  - initialProjectInfo: "$_initialProjectInfo"');
-        print('  - projectAssessment: "${_projectAssessment.length} chars"');
-        print('  - projectKnowledge: "${_projectKnowledge.length} chars"');
-        print('  - exampleQuestions: $_exampleQuestions');
         return ProjectOverview(
           projectInfoController: _projectInfoController,
           initialProjectInfo: _initialProjectInfo,

@@ -126,7 +126,6 @@ class ProjectService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('DEBUG: ProjectInfo API response: $data');
         
         // Handle different response formats
         if (data['status'] == 'success') {
@@ -160,11 +159,9 @@ class ProjectService {
       if (snapshot.snapshot.exists) {
         final data = snapshot.snapshot.value as Map<dynamic, dynamic>?;
         final knowledge = data?['wissensstand']?.toString() ?? '';
-        print('DEBUG: ProjectKnowledge loaded from Firebase: "${knowledge.length} chars"');
         _projectKnowledgeCache[projectName] = knowledge;
         return knowledge;
       } else {
-        print('DEBUG: No assessment data found in Firebase for $projectName');
         _projectKnowledgeCache[projectName] = '';
         return '';
       }
@@ -199,13 +196,11 @@ class ProjectService {
         if (data != null) {
           // Gebe den JSON-String der Assessment-Daten zurück (inkl. aller Felder)
           final jsonString = json.encode(data);
-          print('DEBUG: ProjectAssessment loaded from Firebase (JSON): "${jsonString.length} chars"');
           _projectAssessmentCache[projectName] = jsonString;
           return jsonString;
         }
       }
       
-      print('DEBUG: No assessment data found in Firebase for $projectName');
       _projectAssessmentCache[projectName] = '';
       return '';
     } catch (e) {
@@ -251,7 +246,6 @@ class ProjectService {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('DEBUG: ExampleQuestions API response: $data');
         
         // Handle different status responses
         if (data['status'] == 'success') {
