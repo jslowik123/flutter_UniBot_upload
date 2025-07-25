@@ -1,16 +1,9 @@
-# file_import
+### Projekt- und Chatbot Management UI
+Das ist die UI für die Verwaltung der Chatbots.
 
-A new Flutter project.
+Oberfläche starten
 
-## Getting Started
+```bash
+flutter run -d chrome
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Achtung: Die Datenbank (Firebase) URL ist hardcoded, bei eigener Benutzung ändern.
