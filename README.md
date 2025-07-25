@@ -5,5 +5,5 @@ Oberfläche starten
 
 ```bash
 flutter run -d chrome
-
+```
 Achtung: Die Datenbank (Firebase) URL ist hardcoded, bei eigener Benutzung ändern.
