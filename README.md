@@ -1,7 +1,7 @@
 ### Projekt- und Chatbot Management UI
 Das ist die UI für die Verwaltung der Chatbots.
 
-Oberfläche starten
+Oberfläche starten:
 
 ```bash
 flutter run -d chrome
